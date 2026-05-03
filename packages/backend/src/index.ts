@@ -15,6 +15,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust reverse proxy (e.g. nginx, Docker) so rate limiting uses real client IP
+app.set("trust proxy", 1);
+
 // CORS configuration — restrict to configured origins in production
 const corsOrigin = process.env.CORS_ORIGIN;
 app.use(
