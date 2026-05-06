@@ -21,6 +21,7 @@ import { TemplateDrawHandler } from "./TemplateDrawHandler";
 import { PencilDrawHandler } from "./PencilDrawHandler";
 import { ObstacleDrawHandler } from "./ObstacleDrawHandler";
 import { ObstaclePolygon } from "./ObstaclePolygon";
+import { CameraFrustum } from "./CameraFrustum";
 import { Triangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -428,6 +429,9 @@ export function MapView() {
   const isAddingPoi = useMissionStore((s) => s.isAddingPoi);
   const isDrawingObstacle = useMissionStore((s) => s.isDrawingObstacle);
   const templateMode = useMissionStore((s) => s.templateMode);
+  const selectedWaypointIndices = useMissionStore(
+    (s) => s.selectedWaypointIndices,
+  );
   const addWaypoint = useMissionStore((s) => s.addWaypoint);
   const addPoi = useMissionStore((s) => s.addPoi);
   const addObstacle = useMissionStore((s) => s.addObstacle);
@@ -561,6 +565,14 @@ export function MapView() {
         {waypoints.map((wp) => (
           <WaypointMarker key={wp.index} waypoint={wp} is3D={is3D} />
         ))}
+        {selectedWaypointIndices.size === 1 &&
+          (() => {
+            const idx = [...selectedWaypointIndices][0];
+            const wp = waypoints.find((w) => w.index === idx);
+            return wp ? (
+              <CameraFrustum waypoint={wp} pois={pois} is3D={is3D} />
+            ) : null;
+          })()}
         {pois.map((poi) => (
           <PoiMarker key={poi.id} poi={poi} is3D={is3D} />
         ))}
