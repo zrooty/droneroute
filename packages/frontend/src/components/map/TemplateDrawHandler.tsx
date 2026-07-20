@@ -64,6 +64,7 @@ export function TemplateDrawHandler() {
   const templateMode = useMissionStore((s) => s.templateMode);
   const setTemplateMode = useMissionStore((s) => s.setTemplateMode);
   const appendWaypoints = useMissionStore((s) => s.appendWaypoints);
+  const pendingImportPolygon = useMissionStore((s) => s.pendingImportPolygon);
   const { current: map } = useMap();
 
   const [dragging, setDragging] = useState(false);
@@ -86,6 +87,26 @@ export function TemplateDrawHandler() {
   useEffect(() => {
     resetState();
   }, [templateMode, resetState]);
+
+  // Seed the grid config panel from an imported KML polygon, skipping the
+  // manual drag-to-draw step. Keyed on pendingImportPolygon (not
+  // templateMode) so it fires even if the user was already in "grid" mode
+  // when they imported.
+  useEffect(() => {
+    if (!pendingImportPolygon) return;
+
+    const lats = pendingImportPolygon.map(([lat]) => lat);
+    const lngs = pendingImportPolygon.map(([, lng]) => lng);
+
+    setGridParams({
+      ...DEFAULT_GRID_PARAMS,
+      corner1: [Math.min(...lats), Math.min(...lngs)],
+      corner2: [Math.max(...lats), Math.max(...lngs)],
+      polygon: pendingImportPolygon,
+    });
+    setConfirmed(true);
+    useMissionStore.getState().setPendingImportPolygon(null);
+  }, [pendingImportPolygon]);
 
   // Map mouse events for drag-to-draw
   useEffect(() => {
@@ -257,6 +278,22 @@ export function TemplateDrawHandler() {
     return null;
   }, [dragging, dragState, templateMode]);
 
+  const importedPolygonGeojson = useMemo(() => {
+    if (!gridParams?.polygon) return null;
+    const ring = gridParams.polygon;
+    return {
+      type: "Feature" as const,
+      properties: {},
+      geometry: {
+        type: "LineString" as const,
+        coordinates: [
+          ...ring.map(([lat, lng]) => [lng, lat]),
+          [ring[0][1], ring[0][0]],
+        ],
+      },
+    };
+  }, [gridParams]);
+
   if (!templateMode || templateMode === "pencil") return null;
 
   const handleApply = () => {
@@ -286,6 +323,26 @@ export function TemplateDrawHandler() {
               "line-width": 2,
               "line-opacity": 0.5,
               "line-dasharray": [3, 2],
+            }}
+          />
+        </Source>
+      )}
+
+      {/* Imported KML polygon boundary, shown alongside the generated grid */}
+      {importedPolygonGeojson && (
+        <Source
+          id="imported-polygon-guide"
+          type="geojson"
+          data={importedPolygonGeojson}
+        >
+          <Layer
+            id="imported-polygon-guide-layer"
+            type="line"
+            paint={{
+              "line-color": "#34d399",
+              "line-width": 2,
+              "line-opacity": 0.8,
+              "line-dasharray": [2, 2],
             }}
           />
         </Source>
