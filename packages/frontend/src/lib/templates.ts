@@ -4,6 +4,7 @@ import type {
   WaypointAction,
 } from "@droneroute/shared";
 import { DEFAULT_WAYPOINT } from "@droneroute/shared";
+import { pointInPolygon } from "@/lib/geo";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -70,6 +71,74 @@ function haversine(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/**
+ * Parametric intersection of segment (p1->p2) with segment (p3->p4).
+ * Returns the t value along p1->p2 (0..1) if they cross, else null.
+ */
+function segmentIntersectionT(
+  p1: [number, number],
+  p2: [number, number],
+  p3: [number, number],
+  p4: [number, number],
+): number | null {
+  const [y1, x1] = p1;
+  const [y2, x2] = p2;
+  const [y3, x3] = p3;
+  const [y4, x4] = p4;
+
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (denom === 0) return null; // parallel
+
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denom;
+
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return t;
+}
+
+/** All parametric `t` values (0..1) where segment p1->p2 crosses a polygon edge. */
+function lineSegmentPolygonIntersections(
+  p1: [number, number],
+  p2: [number, number],
+  polygon: [number, number][],
+): number[] {
+  const ts: number[] = [];
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const t = segmentIntersectionT(p1, p2, polygon[j], polygon[i]);
+    if (t !== null) ts.push(t);
+  }
+  return ts;
+}
+
+/**
+ * Clip a grid pass segment (p1->p2) to the outermost points where it
+ * crosses the polygon boundary. Returns null if the segment never touches
+ * the polygon at all (that pass is skipped). Concave polygons that are
+ * crossed more than twice on the same row are NOT split into multiple
+ * segments — the drone flies a straight line across any interior gap,
+ * bounded by the two most extreme crossing points.
+ */
+export function clipSegmentToPolygon(
+  p1: [number, number],
+  p2: [number, number],
+  polygon: [number, number][],
+): [[number, number], [number, number]] | null {
+  const ts = lineSegmentPolygonIntersections(p1, p2, polygon);
+  if (pointInPolygon(p1, polygon)) ts.push(0);
+  if (pointInPolygon(p2, polygon)) ts.push(1);
+
+  if (ts.length < 2) return null;
+
+  const tMin = Math.min(...ts);
+  const tMax = Math.max(...ts);
+  const lerp = (t: number): [number, number] => [
+    p1[0] + t * (p2[0] - p1[0]),
+    p1[1] + t * (p2[1] - p1[1]),
+  ];
+
+  return [lerp(tMin), lerp(tMax)];
+}
+
 // ── Template Types ───────────────────────────────────────
 
 export type TemplateType = "orbit" | "grid" | "facade" | "pencil";
@@ -91,6 +160,7 @@ export interface GridParams {
   addPhotos: boolean;
   rotationDeg: number; // rotation of the grid in degrees (0-360)
   reverse: boolean; // fly the grid in reverse order
+  polygon?: [number, number][]; // clip grid lines to this ring (KML import)
 }
 
 export interface FacadeParams {
@@ -222,6 +292,7 @@ export function generateGrid(params: GridParams): TemplateResult {
     addPhotos,
     rotationDeg,
     reverse,
+    polygon,
   } = params;
   const [lat1, lng1] = corner1;
   const [lat2, lng2] = corner2;
@@ -301,8 +372,18 @@ export function generateGrid(params: GridParams): TemplateResult {
     }
 
     // Apply rotation
-    const [rLat1, rLng1] = rotatePoint(wpLat1, wpLng1);
-    const [rLat2, rLng2] = rotatePoint(wpLat2, wpLng2);
+    let [rLat1, rLng1] = rotatePoint(wpLat1, wpLng1);
+    let [rLat2, rLng2] = rotatePoint(wpLat2, wpLng2);
+
+    if (polygon) {
+      const clipped = clipSegmentToPolygon(
+        [rLat1, rLng1],
+        [rLat2, rLng2],
+        polygon,
+      );
+      if (!clipped) continue; // this row never touches the polygon
+      [[rLat1, rLng1], [rLat2, rLng2]] = clipped;
+    }
 
     waypoints.push({
       ...DEFAULT_WAYPOINT,
