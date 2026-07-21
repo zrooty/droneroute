@@ -511,6 +511,12 @@ export const useMissionStore = create<MissionState>((set, get) => ({
         ...wp,
         index: startIndex + i,
         name: `Waypoint ${startIndex + i + 1}`,
+        actionTrigger: wp.actionTrigger
+          ? {
+              ...wp.actionTrigger,
+              endIndex: wp.actionTrigger.endIndex + startIndex,
+            }
+          : undefined,
       }));
 
       const fullPois: PointOfInterest[] = (newPois || []).map((p) => ({
