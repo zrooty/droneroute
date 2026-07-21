@@ -155,12 +155,12 @@ DJI's WPML format auto-fires the action at the given distance interval between t
 
 ## Testing
 
-- `gsd.ts`: unit tests for `groundFootprint`/`spacingFromSidelap`/`intervalFromFrontlap`/`gsdCm` against hand-computed values for real camera specs (e.g. M3E, M30T).
-- `templates.ts`: extend existing grid tests to cover `spacingMode: "overlap"` producing `actionTrigger` on line-start waypoints only, and `endIndex` offsets that are correctly shifted after `missionStore.appendWaypoints`.
-- `wpml.ts`: extend existing export tests to assert `multipleDistance` XML shape when a waypoint carries `actionTrigger`.
+- `gsd.ts`: unit tests for `groundFootprint`/`spacingFromSidelap`/`intervalFromFrontlap`/`gsdCm` against hand-computed values for real camera specs (e.g. M3E, M30T). Note: neither `templates.ts` nor `wpml.ts` have existing test files today — the frontend package has no test runner at all yet, so this also means adding one (Vitest, matching the backend's setup).
+- `templates.ts`: new tests covering `spacingMode: "overlap"` producing `actionTrigger` on line-start waypoints only, and `endIndex` offsets that are correctly shifted after `missionStore.appendWaypoints`.
+- `wpml.ts`: new tests asserting both the existing `reachPoint` XML shape (regression coverage) and the new `multipleDistance` XML shape when a waypoint carries `actionTrigger`.
 - Manual QA in-browser (Grid survey panel, before/after screenshots) per `AGENTS.md`'s UI screenshot workflow.
 
 ## Docs
 
 - Changelog entry (`changelog/*.md`).
-- Update `specs/mission-planning.md` (grid survey section) per `AGENTS.md`'s mandatory spec-sync rule.
+- Update `specs/templates.md` (this repo documents template features there, not in `mission-planning.md`) per `AGENTS.md`'s mandatory spec-sync rule.
