@@ -124,14 +124,23 @@ function buildActionGroupXml(wp: Waypoint, groupIdOffset: number): string {
 
   const actionsXml = wp.actions.map(buildActionXml).join("");
 
+  const triggerXml =
+    wp.actionTrigger?.type === "multipleDistance"
+      ? `
+            <wpml:actionTriggerType>multipleDistance</wpml:actionTriggerType>
+            <wpml:actionTriggerParam>${wp.actionTrigger.distanceM}</wpml:actionTriggerParam>`
+      : `
+            <wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>`;
+
+  const endIndex = wp.actionTrigger?.endIndex ?? wp.index;
+
   return `
         <wpml:actionGroup>
           <wpml:actionGroupId>${groupIdOffset}</wpml:actionGroupId>
           <wpml:actionGroupStartIndex>${wp.index}</wpml:actionGroupStartIndex>
-          <wpml:actionGroupEndIndex>${wp.index}</wpml:actionGroupEndIndex>
+          <wpml:actionGroupEndIndex>${endIndex}</wpml:actionGroupEndIndex>
           <wpml:actionGroupMode>sequence</wpml:actionGroupMode>
-          <wpml:actionTrigger>
-            <wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>
+          <wpml:actionTrigger>${triggerXml}
           </wpml:actionTrigger>${actionsXml}
         </wpml:actionGroup>`;
 }
