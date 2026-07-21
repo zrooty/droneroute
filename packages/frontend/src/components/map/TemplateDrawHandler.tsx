@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Source, Layer, Marker, useMap } from "react-map-gl/mapbox";
 import { useMissionStore } from "@/store/missionStore";
+import { DRONE_MODELS } from "@droneroute/shared";
 import { TemplateConfigPanel } from "./TemplateConfigPanel";
 import { TemplatePreview } from "./TemplatePreview";
 import type {
@@ -64,7 +65,16 @@ export function TemplateDrawHandler() {
   const templateMode = useMissionStore((s) => s.templateMode);
   const setTemplateMode = useMissionStore((s) => s.setTemplateMode);
   const appendWaypoints = useMissionStore((s) => s.appendWaypoints);
+  const missionConfig = useMissionStore((s) => s.config);
   const { current: map } = useMap();
+
+  const camera = DRONE_MODELS.find(
+    (d) =>
+      d.droneEnumValue === missionConfig.droneEnumValue &&
+      d.droneSubEnumValue === missionConfig.droneSubEnumValue,
+  )?.payloads.find(
+    (p) => p.payloadEnumValue === missionConfig.payloadEnumValue,
+  )?.camera;
 
   const [dragging, setDragging] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -353,6 +363,7 @@ export function TemplateDrawHandler() {
           orbitParams={orbitParams}
           gridParams={gridParams}
           facadeParams={facadeParams}
+          camera={camera}
           onOrbitChange={setOrbitParams}
           onGridChange={setGridParams}
           onFacadeChange={setFacadeParams}
