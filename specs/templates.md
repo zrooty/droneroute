@@ -5,7 +5,7 @@ Create common flight patterns automatically instead of placing waypoints one by 
 ## What you can do
 
 - **Orbit**: fly a circular path around a center point. Choose radius, number of waypoints, and direction (clockwise or counter-clockwise).
-- **Grid survey**: fly a back-and-forth zigzag pattern over an area. Useful for mapping or photogrammetry.
+- **Grid survey**: fly a back-and-forth zigzag pattern over an area. Useful for mapping or photogrammetry. You can draw the area by hand, or import a KML polygon (e.g. from ArcGIS) and the grid will automatically follow its shape.
 - **Facade scan**: fly a vertical scanning pattern along a building face. Useful for inspections.
 - **Pencil path**: draw a freehand path on the map and the app places evenly spaced waypoints along it.
 
@@ -20,3 +20,4 @@ Create common flight patterns automatically instead of placing waypoints one by 
 
 - You can combine templates — for example, use a grid survey and then add an orbit around a specific structure.
 - All generated waypoints behave like normal waypoints after placement. You can move, delete, or change their settings.
+- Importing a KML polygon only uses the first polygon found in the file. Concave areas are supported — the grid follows the boundary, flying straight across any interior notches rather than detouring around them.

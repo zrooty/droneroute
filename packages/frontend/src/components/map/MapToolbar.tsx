@@ -9,11 +9,14 @@ import {
   PenLine,
   ChevronDown,
   Triangle,
+  FileUp,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useMissionStore } from "@/store/missionStore";
 import type { TemplateType } from "@/lib/templates";
+import { parseKmlPolygon } from "@/lib/kmlImport";
 
 const activeClass =
   "bg-primary text-primary-foreground ring-2 ring-primary/50 shadow-lg shadow-primary/20 hover:bg-primary/90";
@@ -71,6 +74,7 @@ export function MapToolbar() {
     setIsAddingPoi,
     setIsDrawingObstacle,
     setTemplateMode,
+    setPendingImportPolygon,
     waypoints,
     pois,
     obstacles,
@@ -79,6 +83,7 @@ export function MapToolbar() {
 
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const kmlInputRef = useRef<HTMLInputElement>(null);
 
   // Close menu on outside click
   useEffect(() => {
@@ -91,6 +96,25 @@ export function MapToolbar() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showTemplateMenu]);
+
+  const handleImportKmlChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const text = await file.text();
+    const polygon = parseKmlPolygon(text);
+
+    if (!polygon) {
+      toast.error("Could not find a polygon in that KML file");
+    } else {
+      setTemplateMode("grid");
+      setPendingImportPolygon(polygon);
+    }
+
+    e.target.value = "";
+  };
 
   const isPanning =
     !isAddingWaypoint && !isAddingPoi && !isDrawingObstacle && !templateMode;
@@ -201,8 +225,30 @@ export function MapToolbar() {
                 </button>
               );
             })}
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent transition-colors border-t border-border"
+              onClick={() => {
+                kmlInputRef.current?.click();
+                setShowTemplateMenu(false);
+              }}
+            >
+              <FileUp className="h-4 w-4 shrink-0" />
+              <div className="text-left flex-1">
+                <div className="font-medium">Import area (KML)</div>
+                <div className="text-[10px] text-muted-foreground">
+                  Generate a grid survey from a KML polygon
+                </div>
+              </div>
+            </button>
           </div>
         )}
+        <input
+          ref={kmlInputRef}
+          type="file"
+          accept=".kml"
+          onChange={handleImportKmlChange}
+          className="hidden"
+        />
       </div>
 
       <Button
