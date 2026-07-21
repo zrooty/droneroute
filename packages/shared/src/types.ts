@@ -116,6 +116,13 @@ export interface DroneModel {
 export interface PayloadModel {
   label: string;
   payloadEnumValue: number;
+  camera?: {
+    sensorWidthMm: number;
+    sensorHeightMm: number;
+    focalLengthMm: number;
+    imageWidthPx: number;
+    imageHeightPx: number;
+  };
 }
 
 export const DRONE_MODELS: DroneModel[] = [
@@ -124,8 +131,28 @@ export const DRONE_MODELS: DroneModel[] = [
     droneEnumValue: 60,
     droneSubEnumValue: 0,
     payloads: [
-      { label: "H20", payloadEnumValue: 42 },
-      { label: "H20T", payloadEnumValue: 43 },
+      {
+        label: "H20",
+        payloadEnumValue: 42,
+        camera: {
+          sensorWidthMm: 6.3,
+          sensorHeightMm: 4.7,
+          focalLengthMm: 4.5,
+          imageWidthPx: 4000,
+          imageHeightPx: 3000,
+        },
+      },
+      {
+        label: "H20T",
+        payloadEnumValue: 43,
+        camera: {
+          sensorWidthMm: 6.3,
+          sensorHeightMm: 4.7,
+          focalLengthMm: 4.5,
+          imageWidthPx: 4000,
+          imageHeightPx: 3000,
+        },
+      },
       { label: "H20N", payloadEnumValue: 61 },
       { label: "PSDK", payloadEnumValue: 65534 },
     ],
@@ -134,13 +161,37 @@ export const DRONE_MODELS: DroneModel[] = [
     label: "DJI M30",
     droneEnumValue: 67,
     droneSubEnumValue: 0,
-    payloads: [{ label: "M30 Camera", payloadEnumValue: 52 }],
+    payloads: [
+      {
+        label: "M30 Camera",
+        payloadEnumValue: 52,
+        camera: {
+          sensorWidthMm: 6.4,
+          sensorHeightMm: 4.8,
+          focalLengthMm: 4.5,
+          imageWidthPx: 4000,
+          imageHeightPx: 3000,
+        },
+      },
+    ],
   },
   {
     label: "DJI M30T",
     droneEnumValue: 67,
     droneSubEnumValue: 1,
-    payloads: [{ label: "M30T Camera", payloadEnumValue: 53 }],
+    payloads: [
+      {
+        label: "M30T Camera",
+        payloadEnumValue: 53,
+        camera: {
+          sensorWidthMm: 6.4,
+          sensorHeightMm: 4.8,
+          focalLengthMm: 4.5,
+          imageWidthPx: 4000,
+          imageHeightPx: 3000,
+        },
+      },
+    ],
   },
   {
     // droneEnumValue 68 appears in real DJI KMZ files (likely Dock-paired M30 variant)
@@ -148,35 +199,111 @@ export const DRONE_MODELS: DroneModel[] = [
     droneEnumValue: 68,
     droneSubEnumValue: 0,
     payloads: [
-      { label: "M30 Camera", payloadEnumValue: 52 },
-      { label: "M30T Camera", payloadEnumValue: 53 },
+      {
+        label: "M30 Camera",
+        payloadEnumValue: 52,
+        camera: {
+          sensorWidthMm: 6.4,
+          sensorHeightMm: 4.8,
+          focalLengthMm: 4.5,
+          imageWidthPx: 4000,
+          imageHeightPx: 3000,
+        },
+      },
+      {
+        label: "M30T Camera",
+        payloadEnumValue: 53,
+        camera: {
+          sensorWidthMm: 6.4,
+          sensorHeightMm: 4.8,
+          focalLengthMm: 4.5,
+          imageWidthPx: 4000,
+          imageHeightPx: 3000,
+        },
+      },
     ],
   },
   {
     label: "DJI Mavic 3E",
     droneEnumValue: 77,
     droneSubEnumValue: 0,
-    payloads: [{ label: "M3E Camera", payloadEnumValue: 66 }],
+    payloads: [
+      {
+        label: "M3E Camera",
+        payloadEnumValue: 66,
+        camera: {
+          sensorWidthMm: 17.3,
+          sensorHeightMm: 13.0,
+          focalLengthMm: 12.29,
+          imageWidthPx: 5280,
+          imageHeightPx: 3956,
+        },
+      },
+    ],
   },
   {
     label: "DJI Mavic 3T",
     droneEnumValue: 77,
     droneSubEnumValue: 1,
-    payloads: [{ label: "M3T Camera", payloadEnumValue: 67 }],
+    payloads: [
+      {
+        label: "M3T Camera",
+        payloadEnumValue: 67,
+        camera: {
+          sensorWidthMm: 17.3,
+          sensorHeightMm: 13.0,
+          focalLengthMm: 12.29,
+          imageWidthPx: 5280,
+          imageHeightPx: 3956,
+        },
+      },
+    ],
   },
   {
     label: "DJI Mavic 3M",
     droneEnumValue: 77,
     droneSubEnumValue: 2,
-    payloads: [{ label: "M3M Camera", payloadEnumValue: 68 }],
+    payloads: [
+      {
+        label: "M3M Camera",
+        payloadEnumValue: 68,
+        camera: {
+          sensorWidthMm: 17.3,
+          sensorHeightMm: 13.0,
+          focalLengthMm: 12.29,
+          imageWidthPx: 5280,
+          imageHeightPx: 3956,
+        },
+      },
+    ],
   },
   {
     label: "DJI M350 RTK",
     droneEnumValue: 89,
     droneSubEnumValue: 0,
     payloads: [
-      { label: "H20", payloadEnumValue: 42 },
-      { label: "H20T", payloadEnumValue: 43 },
+      {
+        label: "H20",
+        payloadEnumValue: 42,
+        camera: {
+          sensorWidthMm: 6.3,
+          sensorHeightMm: 4.7,
+          focalLengthMm: 4.5,
+          imageWidthPx: 4000,
+          imageHeightPx: 3000,
+        },
+      },
+      {
+        label: "H20T",
+        payloadEnumValue: 43,
+        camera: {
+          sensorWidthMm: 6.3,
+          sensorHeightMm: 4.7,
+          focalLengthMm: 4.5,
+          imageWidthPx: 4000,
+          imageHeightPx: 3000,
+        },
+      },
       { label: "H20N", payloadEnumValue: 61 },
       { label: "H30", payloadEnumValue: 82 },
       { label: "H30T", payloadEnumValue: 83 },
@@ -187,13 +314,37 @@ export const DRONE_MODELS: DroneModel[] = [
     label: "DJI Mavic 3D",
     droneEnumValue: 91,
     droneSubEnumValue: 0,
-    payloads: [{ label: "M3D Camera", payloadEnumValue: 80 }],
+    payloads: [
+      {
+        label: "M3D Camera",
+        payloadEnumValue: 80,
+        camera: {
+          sensorWidthMm: 17.3,
+          sensorHeightMm: 13.0,
+          focalLengthMm: 12.29,
+          imageWidthPx: 5280,
+          imageHeightPx: 3956,
+        },
+      },
+    ],
   },
   {
     label: "DJI Mavic 3TD",
     droneEnumValue: 91,
     droneSubEnumValue: 1,
-    payloads: [{ label: "M3TD Camera", payloadEnumValue: 81 }],
+    payloads: [
+      {
+        label: "M3TD Camera",
+        payloadEnumValue: 81,
+        camera: {
+          sensorWidthMm: 17.3,
+          sensorHeightMm: 13.0,
+          focalLengthMm: 12.29,
+          imageWidthPx: 5280,
+          imageHeightPx: 3956,
+        },
+      },
+    ],
   },
   {
     label: "DJI Mini 4 Pro",
@@ -242,6 +393,14 @@ export interface Waypoint {
   turnDampingDist?: number;
   gimbalPitchAngle: number;
   actions: WaypointAction[];
+  // When present, this waypoint's action group spans to `endIndex` and fires
+  // continuously every `distanceM` meters (grid survey frontlap), instead of
+  // the default single-point "reachPoint" trigger.
+  actionTrigger?: {
+    type: "multipleDistance";
+    distanceM: number;
+    endIndex: number;
+  };
 }
 
 // ── Mission Config ───────────────────────────────────────
