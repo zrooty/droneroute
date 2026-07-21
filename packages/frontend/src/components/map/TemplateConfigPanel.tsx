@@ -313,7 +313,7 @@ export function TemplateConfigPanel({
             </Button>
           </div>
 
-          {gridParams.spacingMode === "manual" && (
+          {(gridParams.spacingMode === "manual" || !camera) && (
             <div className="mb-2">
               <Label className="text-[10px]">
                 Line spacing ({distanceLabel(unitSystem)})
