@@ -24,6 +24,12 @@ import {
   fromDisplayDistance,
   speedRange,
 } from "@/lib/units";
+import {
+  spacingFromSidelap,
+  intervalFromFrontlap,
+  gsdCm,
+  type CameraSpec,
+} from "@/lib/gsd";
 import type {
   TemplateType,
   OrbitParams,
@@ -39,6 +45,7 @@ interface TemplateConfigPanelProps {
   gridParams?: GridParams | null;
   facadeParams?: FacadeParams | null;
   pencilParams?: PencilParams | null;
+  camera?: CameraSpec;
   onOrbitChange?: (params: OrbitParams) => void;
   onGridChange?: (params: GridParams) => void;
   onFacadeChange?: (params: FacadeParams) => void;
@@ -55,6 +62,7 @@ export function TemplateConfigPanel({
   gridParams,
   facadeParams,
   pencilParams,
+  camera,
   onOrbitChange,
   onGridChange,
   onFacadeChange,
@@ -211,55 +219,207 @@ export function TemplateConfigPanel({
 
       {/* Grid params */}
       {type === "grid" && gridParams && onGridChange && (
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <div>
-            <Label className="text-[10px]">
-              Altitude ({heightLabel(unitSystem)})
-            </Label>
-            <NumericInput
-              value={toDisplayHeight(gridParams.altitude, unitSystem)}
-              onChange={(v) =>
-                onGridChange({
-                  ...gridParams,
-                  altitude: fromDisplayHeight(v, unitSystem),
-                })
+        <div className="mb-3">
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <Label className="text-[10px]">
+                Altitude ({heightLabel(unitSystem)})
+              </Label>
+              <NumericInput
+                value={toDisplayHeight(gridParams.altitude, unitSystem)}
+                onChange={(v) => {
+                  const altitude = fromDisplayHeight(v, unitSystem);
+                  const overlapUpdates =
+                    gridParams.spacingMode === "overlap" && camera
+                      ? {
+                          spacingM: Math.max(
+                            1,
+                            Math.round(
+                              spacingFromSidelap(
+                                camera,
+                                altitude,
+                                gridParams.sidelapPct ?? 70,
+                              ),
+                            ),
+                          ),
+                          photoIntervalM: Math.max(
+                            1,
+                            Math.round(
+                              intervalFromFrontlap(
+                                camera,
+                                altitude,
+                                gridParams.frontlapPct ?? 80,
+                              ),
+                            ),
+                          ),
+                        }
+                      : {};
+                  onGridChange({ ...gridParams, altitude, ...overlapUpdates });
+                }}
+                min={5}
+                step={5}
+                fallback={80}
+                className="h-7 text-xs"
+              />
+            </div>
+            <div>
+              <Label className="text-[10px]">Rotation (°)</Label>
+              <NumericInput
+                value={gridParams.rotationDeg}
+                onChange={(v) =>
+                  onGridChange({ ...gridParams, rotationDeg: v })
+                }
+                min={-180}
+                max={180}
+                step={5}
+                fallback={0}
+                className="h-7 text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-1 mb-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={
+                gridParams.spacingMode === "manual" ? "default" : "outline"
               }
-              min={5}
-              step={5}
-              fallback={80}
-              className="h-7 text-xs"
-            />
-          </div>
-          <div>
-            <Label className="text-[10px]">
-              Line spacing ({distanceLabel(unitSystem)})
-            </Label>
-            <NumericInput
-              value={toDisplayDistance(gridParams.spacingM, unitSystem)}
-              onChange={(v) =>
-                onGridChange({
-                  ...gridParams,
-                  spacingM: fromDisplayDistance(v, unitSystem),
-                })
+              className="h-6 flex-1 text-[10px]"
+              onClick={() =>
+                onGridChange({ ...gridParams, spacingMode: "manual" })
               }
-              min={3}
-              step={5}
-              fallback={30}
-              className="h-7 text-xs"
-            />
+            >
+              Manual
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={
+                gridParams.spacingMode === "overlap" ? "default" : "outline"
+              }
+              className="h-6 flex-1 text-[10px]"
+              disabled={!camera}
+              title={
+                camera
+                  ? undefined
+                  : "No camera specs for this payload — use manual spacing"
+              }
+              onClick={() =>
+                onGridChange({ ...gridParams, spacingMode: "overlap" })
+              }
+            >
+              Overlap %
+            </Button>
           </div>
-          <div>
-            <Label className="text-[10px]">Rotation (°)</Label>
-            <NumericInput
-              value={gridParams.rotationDeg}
-              onChange={(v) => onGridChange({ ...gridParams, rotationDeg: v })}
-              min={-180}
-              max={180}
-              step={5}
-              fallback={0}
-              className="h-7 text-xs"
-            />
-          </div>
+
+          {gridParams.spacingMode === "manual" && (
+            <div className="mb-2">
+              <Label className="text-[10px]">
+                Line spacing ({distanceLabel(unitSystem)})
+              </Label>
+              <NumericInput
+                value={toDisplayDistance(gridParams.spacingM, unitSystem)}
+                onChange={(v) =>
+                  onGridChange({
+                    ...gridParams,
+                    spacingM: fromDisplayDistance(v, unitSystem),
+                  })
+                }
+                min={3}
+                step={5}
+                fallback={30}
+                className="h-7 text-xs"
+              />
+            </div>
+          )}
+
+          {gridParams.spacingMode === "overlap" && camera && (
+            <div className="mb-2">
+              <div className="grid grid-cols-2 gap-2 mb-1">
+                <div>
+                  <Label className="text-[10px]">Sidelap (%)</Label>
+                  <NumericInput
+                    value={gridParams.sidelapPct ?? 70}
+                    onChange={(v) => {
+                      const sidelapPct = Math.min(95, Math.max(0, v));
+                      onGridChange({
+                        ...gridParams,
+                        sidelapPct,
+                        spacingM: Math.max(
+                          1,
+                          Math.round(
+                            spacingFromSidelap(
+                              camera,
+                              gridParams.altitude,
+                              sidelapPct,
+                            ),
+                          ),
+                        ),
+                      });
+                    }}
+                    min={0}
+                    max={95}
+                    step={5}
+                    fallback={70}
+                    integer
+                    className="h-7 text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[10px]">Frontlap (%)</Label>
+                  <NumericInput
+                    value={gridParams.frontlapPct ?? 80}
+                    onChange={(v) => {
+                      const frontlapPct = Math.min(95, Math.max(0, v));
+                      onGridChange({
+                        ...gridParams,
+                        frontlapPct,
+                        photoIntervalM: Math.max(
+                          1,
+                          Math.round(
+                            intervalFromFrontlap(
+                              camera,
+                              gridParams.altitude,
+                              frontlapPct,
+                            ),
+                          ),
+                        ),
+                      });
+                    }}
+                    min={0}
+                    max={95}
+                    step={5}
+                    fallback={80}
+                    integer
+                    className="h-7 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                Spacing{" "}
+                {Math.round(
+                  spacingFromSidelap(
+                    camera,
+                    gridParams.altitude,
+                    gridParams.sidelapPct ?? 70,
+                  ),
+                )}
+                m{" · "}
+                Interval{" "}
+                {Math.round(
+                  intervalFromFrontlap(
+                    camera,
+                    gridParams.altitude,
+                    gridParams.frontlapPct ?? 80,
+                  ),
+                )}
+                m{" · "}
+                GSD {gsdCm(camera, gridParams.altitude).toFixed(1)}cm/px
+              </div>
+            </div>
+          )}
+
           <div className="flex items-end gap-2 pb-1">
             <label className="flex items-center gap-1.5 text-xs cursor-pointer">
               <input
