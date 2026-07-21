@@ -421,6 +421,9 @@ export interface MissionConfig {
   globalHeadingMode: HeadingMode;
   globalTurnMode: TurnMode;
   gimbalPitchMode: GimbalPitchMode;
+  // Number of separate KMZ files to export a Grid survey mission as.
+  // undefined/1 = no split (single file, today's behavior).
+  splitParts?: number;
 }
 
 // ── Mission ──────────────────────────────────────────────
