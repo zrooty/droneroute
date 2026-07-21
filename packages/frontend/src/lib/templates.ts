@@ -91,6 +91,10 @@ export interface GridParams {
   addPhotos: boolean;
   rotationDeg: number; // rotation of the grid in degrees (0-360)
   reverse: boolean; // fly the grid in reverse order
+  spacingMode: "manual" | "overlap";
+  sidelapPct?: number; // used when spacingMode === "overlap"
+  frontlapPct?: number; // used when spacingMode === "overlap"
+  photoIntervalM?: number; // computed by the panel from frontlapPct, used when spacingMode === "overlap"
 }
 
 export interface FacadeParams {
@@ -140,6 +144,9 @@ export const DEFAULT_GRID_PARAMS: Omit<GridParams, "corner1" | "corner2"> = {
   addPhotos: true,
   rotationDeg: 0,
   reverse: false,
+  spacingMode: "manual",
+  sidelapPct: 70,
+  frontlapPct: 80,
 };
 
 export const DEFAULT_FACADE_PARAMS: Omit<FacadeParams, "point1" | "point2"> = {
@@ -222,6 +229,8 @@ export function generateGrid(params: GridParams): TemplateResult {
     addPhotos,
     rotationDeg,
     reverse,
+    spacingMode,
+    photoIntervalM,
   } = params;
   const [lat1, lng1] = corner1;
   const [lat2, lng2] = corner2;
@@ -304,6 +313,10 @@ export function generateGrid(params: GridParams): TemplateResult {
     const [rLat1, rLng1] = rotatePoint(wpLat1, wpLng1);
     const [rLat2, rLng2] = rotatePoint(wpLat2, wpLng2);
 
+    const lineStartOffset = waypoints.length;
+    const useOverlapTrigger =
+      spacingMode === "overlap" && addPhotos && photoIntervalM !== undefined;
+
     waypoints.push({
       ...DEFAULT_WAYPOINT,
       latitude: rLat1,
@@ -315,6 +328,15 @@ export function generateGrid(params: GridParams): TemplateResult {
       turnMode: "toPointAndStopWithContinuityCurvature",
       useGlobalTurnParam: false,
       actions: addPhotos ? [{ ...takePhotoAction, actionId: 0 }] : [],
+      ...(useOverlapTrigger
+        ? {
+            actionTrigger: {
+              type: "multipleDistance" as const,
+              distanceM: photoIntervalM,
+              endIndex: lineStartOffset + 1, // local offset — shifted to absolute in appendWaypoints
+            },
+          }
+        : {}),
     });
     waypoints.push({
       ...DEFAULT_WAYPOINT,
@@ -326,7 +348,10 @@ export function generateGrid(params: GridParams): TemplateResult {
       headingMode: "followWayline",
       turnMode: "toPointAndStopWithContinuityCurvature",
       useGlobalTurnParam: false,
-      actions: addPhotos ? [{ ...takePhotoAction, actionId: 0 }] : [],
+      actions:
+        addPhotos && !useOverlapTrigger
+          ? [{ ...takePhotoAction, actionId: 0 }]
+          : [],
     });
   }
 
