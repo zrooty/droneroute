@@ -2,37 +2,17 @@
 
 Rules for AI agents working on this codebase.
 
-<!-- BEGIN:pr-workflow-rules -->
+## Solo workflow
 
-## PR-based workflow — MANDATORY
+Personal fork, single user — commit and push directly to `main`. No feature branches, no PRs.
 
-**NEVER commit to `main`. NEVER push to `main`.** All changes go through feature branches and pull requests.
-
-Before making ANY code change:
-
-1. Run `git branch --show-current` to check the current branch
-2. If on `main`, create a feature branch first: `git checkout -b feat/description` (or `fix/`, `refactor/`, `chore/`)
-3. If already on a feature branch, proceed
-
-Every PR must include a changelog entry (`changelog/*.md`) unless it's infrastructure-only — in that case add the `skip-changelog` label.
-
-**Formatting and linting are enforced automatically by a lefthook pre-commit hook** — `prettier --check` and `oxlint` run on staged files at commit time. If they fail, the commit is rejected. Fix formatting with `npm run fmt` and re-commit.
-
-**MANDATORY: Run `npm run build` locally BEFORE pushing.** Do not rely on CI as the first build check — catch errors locally first.
-
-**MANDATORY: Wait for CI checks to pass BEFORE merging a PR.** Even if checks are not required by branch protection, always confirm all checks pass before merging.
-
-**MANDATORY: NEVER merge a PR without the user's explicit permission.** Even if the user says "proceed" or "do it", that means implement + push — NOT merge. Only merge when the user explicitly says "merge it" (or equivalent).
-
-Full workflow details are in the `pr-workflow` OpenCode skill.
-
-<!-- END:pr-workflow-rules -->
+Lefthook pre-commit hook still runs `prettier --check` and `oxlint` on staged files — fix with `npm run fmt` if it fails. Run `npm run build` locally before pushing to catch errors before CI does.
 
 <!-- BEGIN:specs-sync-rules -->
 
 ## Spec documentation sync — MANDATORY
 
-The `specs/` folder contains plain-language descriptions of every feature from the user's perspective. **If a PR adds, removes, or changes any user-facing feature, the corresponding spec file in `specs/` must be updated.** Treat outdated specs the same as a missing changelog entry — the PR is not ready until specs are in sync.
+The `specs/` folder contains plain-language descriptions of every feature from the user's perspective. **If a commit adds, removes, or changes any user-facing feature, the corresponding spec file in `specs/` must be updated.** Treat outdated specs the same as a missing changelog entry.
 
 See `specs/README.md` for the full index.
 
@@ -98,34 +78,9 @@ Full security patterns are in the `security` OpenCode skill.
 
 All tasks, features, and bugs are tracked as **GitHub Issues** (not a local TODO file). Use `gh issue list` at the start of every session to understand what's open.
 
-**Issue linking in PRs is mandatory.** Before creating any PR:
-
-1. Check `gh issue list` for related issues
-2. If the PR fully resolves an issue, include `Fixes #N` in the PR body
-3. If the PR partially addresses an issue, use `Relates to #N` instead
-4. GitHub auto-closes issues linked with `Fixes` when the PR merges
+When a commit resolves an issue, reference it in the commit message (`Fixes #N`) so GitHub auto-closes it.
 
 <!-- END:github-issues-rules -->
-
-<!-- BEGIN:ui-screenshots-rules -->
-
-## UI/UX PRs require screenshots — MANDATORY
-
-**BEFORE writing ANY code that changes UI**, capture "before" screenshots BEFORE touching any files. This is non-negotiable — you lose the ability to capture the original state after modifying code.
-
-Checklist for any PR touching UI:
-
-1. Capture "before" screenshots of affected pages/components
-2. Implement the changes
-3. Capture "after" screenshots and annotate them (red arrows/labels)
-4. Store all images in `docs/screenshots/`
-5. Embed screenshots in the PR description using commit SHA-based GitHub blob URLs
-
-Standard viewport: **1280x720**. Standard map coordinates: **41.25797725781744, 0.9322907667035154**.
-
-Full workflow details are in the `ui-screenshots` OpenCode skill.
-
-<!-- END:ui-screenshots-rules -->
 
 <!-- BEGIN:task-completion-rules -->
 
