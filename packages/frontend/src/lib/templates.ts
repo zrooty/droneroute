@@ -313,10 +313,11 @@ export function generateGrid(params: GridParams): TemplateResult {
     const [rLat1, rLng1] = rotatePoint(wpLat1, wpLng1);
     const [rLat2, rLng2] = rotatePoint(wpLat2, wpLng2);
 
-    const lineStartOffset = waypoints.length;
-    const useOverlapTrigger =
-      spacingMode === "overlap" && addPhotos && photoIntervalM !== undefined;
-
+    // Geometry only here — actions/actionTrigger are assigned AFTER the
+    // final `if (reverse) waypoints.reverse()` below, based on each pair's
+    // final order. Baking them in before that reversal would leave
+    // actionTrigger.endIndex pointing at the wrong (or a backward) index
+    // once the whole array gets flipped.
     waypoints.push({
       ...DEFAULT_WAYPOINT,
       latitude: rLat1,
@@ -327,16 +328,7 @@ export function generateGrid(params: GridParams): TemplateResult {
       headingMode: "followWayline",
       turnMode: "toPointAndStopWithContinuityCurvature",
       useGlobalTurnParam: false,
-      actions: addPhotos ? [{ ...takePhotoAction, actionId: 0 }] : [],
-      ...(useOverlapTrigger
-        ? {
-            actionTrigger: {
-              type: "multipleDistance" as const,
-              distanceM: photoIntervalM,
-              endIndex: lineStartOffset + 1, // local offset — shifted to absolute in appendWaypoints
-            },
-          }
-        : {}),
+      actions: [],
     });
     waypoints.push({
       ...DEFAULT_WAYPOINT,
@@ -348,15 +340,42 @@ export function generateGrid(params: GridParams): TemplateResult {
       headingMode: "followWayline",
       turnMode: "toPointAndStopWithContinuityCurvature",
       useGlobalTurnParam: false,
-      actions:
-        addPhotos && !useOverlapTrigger
-          ? [{ ...takePhotoAction, actionId: 0 }]
-          : [],
+      actions: [],
     });
   }
 
   if (reverse) {
     waypoints.reverse();
+  }
+
+  // Assign actions/actionTrigger from the FINAL waypoint order. Each
+  // line-pass occupies two consecutive indices in `waypoints` — this holds
+  // regardless of `reverse`, because reversing the whole flat array keeps
+  // each pass's two waypoints adjacent (it just flips which one is first).
+  // Whichever waypoint ends up first in a pair carries the photo action
+  // (+ actionTrigger in overlap mode), with endIndex pointing at the pair's
+  // second (final-array) index — always a local, batch-relative, forward
+  // (ascending) range.
+  const useOverlapTrigger =
+    spacingMode === "overlap" && addPhotos && photoIntervalM !== undefined;
+
+  for (let i = 0; i < waypoints.length; i += 2) {
+    const lineFirst = waypoints[i];
+    const lineSecond = waypoints[i + 1];
+
+    if (addPhotos) {
+      lineFirst.actions = [{ ...takePhotoAction, actionId: 0 }];
+    }
+
+    if (useOverlapTrigger) {
+      lineFirst.actionTrigger = {
+        type: "multipleDistance" as const,
+        distanceM: photoIntervalM,
+        endIndex: i + 1, // local offset — shifted to absolute in appendWaypoints
+      };
+    } else if (addPhotos) {
+      lineSecond.actions = [{ ...takePhotoAction, actionId: 0 }];
+    }
   }
 
   return { waypoints, pois: [] };

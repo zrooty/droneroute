@@ -87,4 +87,32 @@ describe("generateGrid — overlap mode", () => {
     });
     expect(overlap.waypoints.length).toBe(manual.waypoints.length);
   });
+
+  it("keeps actionTrigger.endIndex pointing forward within each pair when reverse is true", () => {
+    const result = generateGrid({
+      ...baseParams,
+      spacingMode: "overlap",
+      addPhotos: true,
+      photoIntervalM: 25,
+      reverse: true,
+    });
+    expect(result.waypoints.length).toBeGreaterThan(0);
+    expect(result.waypoints.length % 2).toBe(0);
+
+    for (let i = 0; i < result.waypoints.length; i += 2) {
+      const pairFirst = result.waypoints[i];
+      const pairSecond = result.waypoints[i + 1];
+
+      expect(pairFirst.actions).toHaveLength(1);
+      expect(pairFirst.actions[0].actionType).toBe("takePhoto");
+      expect(pairFirst.actionTrigger).toEqual({
+        type: "multipleDistance",
+        distanceM: 25,
+        endIndex: i + 1, // must point at this pair's own second waypoint
+      });
+
+      expect(pairSecond.actions).toHaveLength(0);
+      expect(pairSecond.actionTrigger).toBeUndefined();
+    }
+  });
 });
