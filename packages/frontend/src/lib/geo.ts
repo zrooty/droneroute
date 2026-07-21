@@ -330,3 +330,123 @@ export function getAirspaceWarnings(
 
   return Array.from(warnings.values());
 }
+
+// ── Flight stats & mission splitting ─────────────────────
+
+/** Per-segment great-circle distance (meters), one entry per consecutive pair. */
+export function segmentDistances(
+  waypoints: { latitude: number; longitude: number }[],
+): number[] {
+  const distances: number[] = [];
+  for (let i = 1; i < waypoints.length; i++) {
+    distances.push(
+      haversineDistance(
+        waypoints[i - 1].latitude,
+        waypoints[i - 1].longitude,
+        waypoints[i].latitude,
+        waypoints[i].longitude,
+      ),
+    );
+  }
+  return distances;
+}
+
+/** Total distance (m) and flight time (s) using per-segment speeds. */
+export function estimateFlightStats(
+  waypoints: {
+    latitude: number;
+    longitude: number;
+    speed: number;
+    useGlobalSpeed: boolean;
+  }[],
+  globalSpeedMs: number,
+): { distance: number; time: number } {
+  const distances = segmentDistances(waypoints);
+  let distance = 0;
+  let time = 0;
+  for (let i = 0; i < distances.length; i++) {
+    const speed = waypoints[i].useGlobalSpeed
+      ? globalSpeedMs
+      : waypoints[i].speed;
+    distance += distances[i];
+    time += speed > 0 ? distances[i] / speed : 0;
+  }
+  return { distance, time };
+}
+
+/**
+ * Split a waypoint path into `partCount` sequential parts of roughly equal
+ * cumulative distance. Each part after the first is prefixed with a
+ * duplicate of the previous part's last waypoint, so consecutive parts
+ * share one coincident waypoint (matches how DJI Pilot itself splits a
+ * flown mission into multiple KMZ files).
+ *
+ * Never cuts between a grid-overlap-mode waypoint and its
+ * `actionTrigger.endIndex` pair — nudges that cut forward by one waypoint
+ * instead, since a `multipleDistance` action group can't span two files.
+ */
+export function splitWaypointsByDistance<
+  T extends {
+    latitude: number;
+    longitude: number;
+    actionTrigger?: { endIndex: number };
+  },
+>(waypoints: T[], partCount: number): T[][] {
+  if (partCount <= 1 || waypoints.length < 2) return [waypoints];
+
+  const distances = segmentDistances(waypoints);
+  const cumulative = [0];
+  for (const d of distances)
+    cumulative.push(cumulative[cumulative.length - 1] + d);
+  const total = cumulative[cumulative.length - 1];
+
+  const cuts: number[] = [];
+  for (let k = 1; k < partCount; k++) {
+    const target = (total * k) / partCount;
+    let bestIdx = 1;
+    let bestDiff = Infinity;
+    for (let idx = 1; idx < waypoints.length; idx++) {
+      const diff = Math.abs(cumulative[idx] - target);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestIdx = idx;
+      }
+    }
+    if (
+      waypoints[bestIdx]?.actionTrigger &&
+      waypoints[bestIdx].actionTrigger.endIndex > bestIdx
+    ) {
+      bestIdx = Math.min(bestIdx + 1, waypoints.length - 1);
+    }
+    const prev = cuts[cuts.length - 1] ?? 0;
+    const nextCut = Math.max(bestIdx, prev + 1);
+    if (nextCut >= waypoints.length - 1) break; // no room for another part
+    cuts.push(nextCut);
+  }
+
+  const parts: T[][] = [];
+  let start = 0;
+  for (const cut of cuts) {
+    parts.push(waypoints.slice(start, cut + 1));
+    start = cut;
+  }
+  parts.push(waypoints.slice(start));
+  return parts.every((p) => p.length >= 2) ? parts : [waypoints];
+}
+
+/**
+ * Rebase a waypoint slice's `.index` (and any `.actionTrigger.endIndex`) so
+ * the first waypoint is index 0 — required before exporting a split part as
+ * its own standalone WPML mission (`buildTemplateKml`/`buildWaylinesWpml`
+ * emit `<wpml:index>` from `.index`, not array position).
+ */
+export function reindexFromZero(waypoints: Waypoint[]): Waypoint[] {
+  const base = waypoints[0]?.index ?? 0;
+  return waypoints.map((wp) => ({
+    ...wp,
+    index: wp.index - base,
+    actionTrigger: wp.actionTrigger
+      ? { ...wp.actionTrigger, endIndex: wp.actionTrigger.endIndex - base }
+      : undefined,
+  }));
+}
