@@ -296,7 +296,9 @@ export function TemplateConfigPanel({
               type="button"
               size="sm"
               variant={
-                gridParams.spacingMode === "overlap" ? "default" : "outline"
+                gridParams.spacingMode === "overlap" && camera
+                  ? "default"
+                  : "outline"
               }
               className="h-6 flex-1 text-[10px]"
               disabled={!camera}
@@ -305,9 +307,35 @@ export function TemplateConfigPanel({
                   ? undefined
                   : "No camera specs for this payload — use manual spacing"
               }
-              onClick={() =>
-                onGridChange({ ...gridParams, spacingMode: "overlap" })
-              }
+              onClick={() => {
+                if (!camera) return;
+                const sidelapPct = gridParams.sidelapPct ?? 70;
+                const frontlapPct = gridParams.frontlapPct ?? 80;
+                onGridChange({
+                  ...gridParams,
+                  spacingMode: "overlap",
+                  spacingM: Math.max(
+                    1,
+                    Math.round(
+                      spacingFromSidelap(
+                        camera,
+                        gridParams.altitude,
+                        sidelapPct,
+                      ),
+                    ),
+                  ),
+                  photoIntervalM: Math.max(
+                    1,
+                    Math.round(
+                      intervalFromFrontlap(
+                        camera,
+                        gridParams.altitude,
+                        frontlapPct,
+                      ),
+                    ),
+                  ),
+                });
+              }}
             >
               Overlap %
             </Button>
