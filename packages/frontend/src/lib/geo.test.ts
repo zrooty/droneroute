@@ -90,6 +90,45 @@ describe("splitWaypointsByDistance", () => {
     expect(partOfIndex5).toBe(partOfIndex6);
   });
 
+  it("catches an actionTrigger boundary that only surfaces after the prev+1 cut clamp", () => {
+    // Custom, non-uniform spacing (segment 4->5 is deliberately long) so that:
+    //  - cut 1's *natural* nearest-distance target is index 4 (pair A's
+    //    trigger-holding waypoint); the safety check nudges it to 5.
+    //  - cut 2's *natural* nearest-distance target is index 5 exactly — the
+    //    shared boundary waypoint of pair A, which carries no actionTrigger
+    //    field of its own, so a naive check on bestIdx (5) looks perfectly
+    //    safe.
+    //  - but nextCut = Math.max(bestIdx, prev + 1) = Math.max(5, 5 + 1) = 6,
+    //    landing squarely on pair B's (6,7) trigger-holding waypoint — a
+    //    value the naive per-bestIdx check never inspects at all.
+    // This reproduces the reviewer's exact scenario: only a re-check against
+    // the final, post-clamp candidate (not the pre-clamp bestIdx) catches it.
+    const cumUnits = [0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15];
+    const unit = 0.0005;
+    const waypoints = cumUnits.map((u, i) => wp(u * unit, i));
+    waypoints[4] = {
+      ...waypoints[4],
+      actionTrigger: { type: "multipleDistance", distanceM: 5, endIndex: 5 },
+    };
+    waypoints[6] = {
+      ...waypoints[6],
+      actionTrigger: { type: "multipleDistance", distanceM: 5, endIndex: 7 },
+    };
+
+    const parts = splitWaypointsByDistance(waypoints, 3);
+
+    for (const [start, end] of [
+      [4, 5],
+      [6, 7],
+    ] as const) {
+      const partOfStart = parts.findIndex((p) =>
+        p.some((w) => w.index === start),
+      );
+      const partOfEnd = parts.findIndex((p) => p.some((w) => w.index === end));
+      expect(partOfStart).toBe(partOfEnd);
+    }
+  });
+
   it("clamps to a single part when there are too few waypoints for the requested count", () => {
     const waypoints = [wp(0, 0), wp(0.001, 1)];
     const parts = splitWaypointsByDistance(waypoints, 5);

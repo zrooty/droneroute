@@ -412,16 +412,20 @@ export function splitWaypointsByDistance<
         bestIdx = idx;
       }
     }
-    if (
-      waypoints[bestIdx]?.actionTrigger &&
-      waypoints[bestIdx].actionTrigger.endIndex > bestIdx
-    ) {
-      bestIdx = Math.min(bestIdx + 1, waypoints.length - 1);
-    }
     const prev = cuts[cuts.length - 1] ?? 0;
-    const nextCut = Math.max(bestIdx, prev + 1);
-    if (nextCut >= waypoints.length - 1) break; // no room for another part
-    cuts.push(nextCut);
+    // The candidate actually used is the post-clamp value, not bestIdx
+    // itself (prev + 1 can override bestIdx when cuts crowd together in a
+    // 3+-way split) — so the actionTrigger safety check must run against
+    // this final value, and keep advancing until it's safe: adjacent
+    // actionTrigger pairs can chain, so a single nudge isn't always enough.
+    let candidate = Math.max(bestIdx, prev + 1);
+    while (candidate < waypoints.length - 1) {
+      const trigger = waypoints[candidate]?.actionTrigger;
+      if (!trigger || trigger.endIndex <= candidate) break;
+      candidate++;
+    }
+    if (candidate >= waypoints.length - 1) break; // no room for another part
+    cuts.push(candidate);
   }
 
   const parts: T[][] = [];
@@ -442,11 +446,19 @@ export function splitWaypointsByDistance<
  */
 export function reindexFromZero(waypoints: Waypoint[]): Waypoint[] {
   const base = waypoints[0]?.index ?? 0;
-  return waypoints.map((wp) => ({
-    ...wp,
-    index: wp.index - base,
-    actionTrigger: wp.actionTrigger
-      ? { ...wp.actionTrigger, endIndex: wp.actionTrigger.endIndex - base }
-      : undefined,
-  }));
+  return waypoints.map((wp) => {
+    const { actionTrigger, ...rest } = wp;
+    return {
+      ...rest,
+      index: wp.index - base,
+      ...(actionTrigger
+        ? {
+            actionTrigger: {
+              ...actionTrigger,
+              endIndex: actionTrigger.endIndex - base,
+            },
+          }
+        : {}),
+    };
+  });
 }
