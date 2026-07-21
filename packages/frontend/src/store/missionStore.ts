@@ -40,10 +40,13 @@ interface MissionState {
   isAddingWaypoint: boolean;
   isAddingPoi: boolean;
   templateMode: TemplateType | null;
+  pendingImportPolygon: [number, number][] | null;
   currentPage: "editor" | "routes" | "shared" | "admin";
   shareToken: string | null;
   setCurrentPage: (page: "editor" | "routes" | "shared" | "admin") => void;
   setShareToken: (token: string | null) => void;
+  setTemplateMode: (mode: TemplateType | null) => void;
+  setPendingImportPolygon: (polygon: [number, number][] | null) => void;
 
   // Waypoint actions
   setMissionName: (name: string) => void;
@@ -75,7 +78,6 @@ interface MissionState {
   movePoi: (id: string, lat: number, lng: number) => void;
   selectPoi: (id: string | null) => void;
   setIsAddingPoi: (adding: boolean) => void;
-  setTemplateMode: (mode: TemplateType | null) => void;
   appendWaypoints: (
     waypoints: Omit<Waypoint, "index" | "name">[],
     pois?: Omit<PointOfInterest, "id">[],
@@ -132,6 +134,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   isAddingWaypoint: true,
   isAddingPoi: false,
   templateMode: null,
+  pendingImportPolygon: null,
   currentPage: "editor",
   shareToken: null,
   setCurrentPage: (page) => set({ currentPage: page }),
@@ -503,6 +506,8 @@ export const useMissionStore = create<MissionState>((set, get) => ({
       selectedWaypointIndices: new Set(),
       selectedPoiId: null,
     }),
+
+  setPendingImportPolygon: (polygon) => set({ pendingImportPolygon: polygon }),
 
   appendWaypoints: (newWps, newPois) =>
     set((state) => {
