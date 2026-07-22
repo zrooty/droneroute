@@ -546,7 +546,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
  * configured, and as the client-side fallback before the config endpoint loads.
  */
 export const DEFAULT_MAP_VIEW: MapViewState = {
-  latitude: 41.3874,
-  longitude: 2.1686,
+  latitude: -7.900863,
+  longitude: 110.295514,
   zoom: 13,
 };
