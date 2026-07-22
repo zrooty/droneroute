@@ -28,6 +28,7 @@ import { MapView } from "@/components/map/MapView";
 import { WaypointList } from "@/components/waypoint/WaypointList";
 import { BulkActionToolbar } from "@/components/waypoint/BulkActionToolbar";
 import { MissionConfig } from "@/components/mission/MissionConfig";
+import { DroneSelect } from "@/components/mission/DroneSelect";
 import { PoiList } from "@/components/mission/PoiList";
 import { ObstacleList } from "@/components/mission/ObstacleList";
 import { RoutesPage } from "@/components/routes/RoutesPage";
@@ -567,6 +568,9 @@ export default function App() {
             onChange={handleImport}
           />
         </div>
+
+        {/* Drone model — top-level because it drives GSD/interval/spacing */}
+        <DroneSelect />
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">

@@ -4,7 +4,7 @@ Configure your drone model, camera, altitude reference, and safety options for t
 
 ## What you can do
 
-- **Choose your drone model**: M300 RTK, M350 RTK, M30/M30T, M30 Dock, Mavic 3E/3T/3M/3D/3TD, Mini 4 Pro.
+- **Choose your drone model**: M300 RTK, M350 RTK, M30/M30T, M30 Dock, Mavic 3E/3T/3M/3D/3TD, Mini 4 Pro. The drone and payload selector sits at the top of the sidebar (not inside the mission settings section) because the chosen model drives GSD, photo interval, and line spacing in grid overlap mode — so it should be set before planning.
 - **Choose a camera/payload** available for the selected drone.
 - **Set a global flight speed** and takeoff security height.
 - **Choose a height reference**:

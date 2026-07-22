@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DRONE_MODELS } from "@droneroute/shared";
 import type {
   HeadingMode,
   FinishAction,
@@ -31,72 +30,8 @@ export function MissionConfig() {
   const { config, setConfig } = useMissionStore();
   const unitSystem = usePreferencesStore((s) => s.preferences.unitSystem);
 
-  const selectedDrone = DRONE_MODELS.find(
-    (d) =>
-      d.droneEnumValue === config.droneEnumValue &&
-      d.droneSubEnumValue === config.droneSubEnumValue,
-  );
-
   return (
     <div className="p-3 space-y-3">
-      <div>
-        <Label className="text-xs">Drone model</Label>
-        <Select
-          value={`${config.droneEnumValue}-${config.droneSubEnumValue}`}
-          onValueChange={(v) => {
-            const [drone, sub] = v.split("-").map(Number);
-            const model = DRONE_MODELS.find(
-              (d) => d.droneEnumValue === drone && d.droneSubEnumValue === sub,
-            );
-            if (model) {
-              setConfig({
-                droneEnumValue: model.droneEnumValue,
-                droneSubEnumValue: model.droneSubEnumValue,
-                payloadEnumValue: model.payloads[0]?.payloadEnumValue || 0,
-              });
-            }
-          }}
-        >
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {DRONE_MODELS.map((d) => (
-              <SelectItem
-                key={`${d.droneEnumValue}-${d.droneSubEnumValue}`}
-                value={`${d.droneEnumValue}-${d.droneSubEnumValue}`}
-              >
-                {d.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {selectedDrone && selectedDrone.payloads.length > 1 && (
-        <div>
-          <Label className="text-xs">Payload</Label>
-          <Select
-            value={String(config.payloadEnumValue)}
-            onValueChange={(v) => setConfig({ payloadEnumValue: parseInt(v) })}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {selectedDrone.payloads.map((p) => (
-                <SelectItem
-                  key={p.payloadEnumValue}
-                  value={String(p.payloadEnumValue)}
-                >
-                  {p.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label className="text-xs">
