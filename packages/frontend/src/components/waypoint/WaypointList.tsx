@@ -12,7 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { useMissionStore } from "@/store/missionStore";
 import type { SelectionMode } from "@/store/missionStore";
 import { usePreferencesStore } from "@/store/preferencesStore";
-import { formatHeight, formatSpeed } from "@/lib/units";
+import {
+  formatHeight,
+  formatSpeed,
+  formatDistance,
+  formatDuration,
+} from "@/lib/units";
+import { splitWaypointsByDistance, estimateFlightStats } from "@/lib/geo";
 import { WaypointEditorInline } from "./WaypointEditor";
 
 export function WaypointList() {
@@ -23,8 +29,33 @@ export function WaypointList() {
     removeWaypoint,
     reorderWaypoints,
     updateWaypoint,
+    config,
   } = useMissionStore();
   const unitSystem = usePreferencesStore((s) => s.preferences.unitSystem);
+
+  // When the mission is split into parts, tag each waypoint with its route
+  // number so the list can show "Route N" section headers. Parts share one
+  // boundary waypoint; assign it to the earlier route so every unique
+  // waypoint maps to exactly one route.
+  const splitParts = config.splitParts ?? 1;
+  const routeInfo =
+    splitParts > 1 && waypoints.length >= 2
+      ? (() => {
+          const parts = splitWaypointsByDistance(waypoints, splitParts);
+          if (parts.length <= 1) return null;
+          const routeOf: number[] = [];
+          const stats = parts.map((p) =>
+            estimateFlightStats(p, config.autoFlightSpeed),
+          );
+          parts.forEach((part, k) => {
+            // Part 0 owns all its waypoints; later parts skip their first
+            // (the shared boundary already counted by the previous part).
+            const count = k === 0 ? part.length : part.length - 1;
+            for (let j = 0; j < count; j++) routeOf.push(k + 1);
+          });
+          return { routeOf, stats };
+        })()
+      : null;
 
   const [expandedEditor, setExpandedEditor] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<number | null>(null);
@@ -126,8 +157,27 @@ export function WaypointList() {
           expandedEditor === wp.index && selectedWaypointIndices.size <= 1;
         const isRenaming = editingName === wp.index;
 
+        const route = routeInfo?.routeOf[i];
+        const showRouteHeader =
+          route !== undefined &&
+          (i === 0 || routeInfo?.routeOf[i - 1] !== route);
+        const routeStats = route ? routeInfo?.stats[route - 1] : undefined;
+
         return (
           <div key={wp.index}>
+            {showRouteHeader && (
+              <div className="flex items-center justify-between gap-2 mt-2 first:mt-0 mb-1 px-1 py-0.5 rounded bg-primary/10 border-l-2 border-primary">
+                <span className="text-[11px] font-semibold text-primary">
+                  Route {route}
+                </span>
+                {routeStats && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {formatDistance(routeStats.distance, unitSystem)} ·{" "}
+                    {formatDuration(routeStats.time)}
+                  </span>
+                )}
+              </div>
+            )}
             <div
               className={`flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition-colors ${
                 isDragging
