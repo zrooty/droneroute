@@ -66,6 +66,7 @@ export function TemplateDrawHandler() {
   const setTemplateMode = useMissionStore((s) => s.setTemplateMode);
   const appendWaypoints = useMissionStore((s) => s.appendWaypoints);
   const missionConfig = useMissionStore((s) => s.config);
+  const setMissionConfig = useMissionStore((s) => s.setConfig);
   const pendingImportPolygon = useMissionStore((s) => s.pendingImportPolygon);
   const { current: map } = useMap();
 
@@ -427,6 +428,13 @@ export function TemplateDrawHandler() {
           onApply={handleApply}
           onCancel={handleCancel}
           waypointCount={activePreview?.waypoints.length ?? 0}
+          previewWaypoints={
+            templateMode === "grid" ? preview?.waypoints : undefined
+          }
+          splitParts={missionConfig.splitParts}
+          onSplitPartsChange={(n) => setMissionConfig({ splitParts: n })}
+          autoFlightSpeed={missionConfig.autoFlightSpeed}
+          maxBatteryMinutes={missionConfig.maxBatteryMinutes}
         />
       )}
     </>
