@@ -44,10 +44,16 @@ import { useMissionStore } from "@/store/missionStore";
 import { useAuthStore } from "@/store/authStore";
 import { useConfigStore } from "@/store/configStore";
 import { usePreferencesStore } from "@/store/preferencesStore";
-import { formatDistance } from "@/lib/units";
+import { formatDistance, formatDuration } from "@/lib/units";
 import { useAirspaceStore } from "@/store/airspaceStore";
 import { api } from "@/lib/api";
-import { getObstacleWarnings, getAirspaceWarnings } from "@/lib/geo";
+import {
+  getObstacleWarnings,
+  getAirspaceWarnings,
+  estimateFlightStats,
+  splitWaypointsByDistance,
+  reindexFromZero,
+} from "@/lib/geo";
 
 type SidebarSection = "waypoints" | "pois" | "obstacles" | "config";
 
@@ -235,19 +241,35 @@ export default function App() {
 
     setExporting(true);
     try {
-      const blob = await api.post<Blob>("/kmz/generate", {
-        name: missionName,
-        config,
-        waypoints,
-        pois,
-      });
+      const parts =
+        config.splitParts && config.splitParts > 1
+          ? splitWaypointsByDistance(waypoints, config.splitParts).map(
+              reindexFromZero,
+            )
+          : [waypoints];
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${missionName.replace(/[^a-zA-Z0-9_-]/g, "_")}.kmz`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const filenameBase = missionName.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+      for (let i = 0; i < parts.length; i++) {
+        const blob = await api.post<Blob>("/kmz/generate", {
+          name: missionName,
+          config,
+          waypoints: parts[i],
+          pois,
+        });
+
+        const filename =
+          parts.length > 1
+            ? `${filenameBase}_part_${i + 1}.kmz`
+            : `${filenameBase}.kmz`;
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
     } catch (err: any) {
       toast.error(`Export failed: ${err.message}`);
     } finally {
@@ -814,61 +836,4 @@ export default function App() {
       <WelcomeDialog />
     </div>
   );
-}
-
-// Haversine distance between two points (meters)
-function haversine(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number,
-): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// Estimate total distance (m) and flight time (s) using per-segment speeds
-function estimateFlightStats(
-  waypoints: {
-    latitude: number;
-    longitude: number;
-    speed: number;
-    useGlobalSpeed: boolean;
-  }[],
-  globalSpeed: number,
-): { distance: number; time: number } {
-  let distance = 0;
-  let time = 0;
-  for (let i = 1; i < waypoints.length; i++) {
-    const prev = waypoints[i - 1];
-    const curr = waypoints[i];
-    const segDist = haversine(
-      prev.latitude,
-      prev.longitude,
-      curr.latitude,
-      curr.longitude,
-    );
-    const speed = curr.useGlobalSpeed ? globalSpeed : curr.speed;
-    distance += segDist;
-    time += speed > 0 ? segDist / speed : 0;
-  }
-  return { distance, time };
-}
-
-// Format seconds into human-readable duration
-function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.round(seconds % 60);
-  if (mins < 60) return `${mins}m${secs > 0 ? ` ${secs}s` : ""}`;
-  const hrs = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hrs}h${remainMins > 0 ? ` ${remainMins}m` : ""}`;
 }

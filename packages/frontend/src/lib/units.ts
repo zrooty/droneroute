@@ -60,6 +60,16 @@ export function formatArea(
   return `${Math.round(areaM2)} m²`;
 }
 
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  if (mins < 60) return `${mins}m${secs > 0 ? ` ${secs}s` : ""}`;
+  const hrs = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  return `${hrs}h${remainMins > 0 ? ` ${remainMins}m` : ""}`;
+}
+
 // ── Labels for form inputs ──────────────────────────────
 
 export function speedLabel(unitSystem: UnitSystem = "metric"): string {
