@@ -365,9 +365,11 @@ export function estimateFlightStats(
   let distance = 0;
   let time = 0;
   for (let i = 0; i < distances.length; i++) {
-    const speed = waypoints[i].useGlobalSpeed
-      ? globalSpeedMs
-      : waypoints[i].speed;
+    // Use the segment's destination waypoint (i+1) speed, matching the
+    // DJI-conventional "speed to fly to a waypoint" reading (and the
+    // pre-refactor App.tsx behavior this was consolidated from).
+    const dest = waypoints[i + 1];
+    const speed = dest.useGlobalSpeed ? globalSpeedMs : dest.speed;
     distance += distances[i];
     time += speed > 0 ? distances[i] / speed : 0;
   }

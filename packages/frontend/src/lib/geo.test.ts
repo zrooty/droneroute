@@ -49,9 +49,12 @@ describe("estimateFlightStats", () => {
   });
 
   it("uses per-waypoint speed when useGlobalSpeed is false", () => {
+    // Speed override lives on the destination (second) waypoint of the
+    // segment — estimateFlightStats uses each segment's destination
+    // waypoint's speed, not its source waypoint's.
     const waypoints = [
-      wp(0, 0, { useGlobalSpeed: false, speed: 5 }),
-      wp(0.001, 1),
+      wp(0, 0),
+      wp(0.001, 1, { useGlobalSpeed: false, speed: 5 }),
     ];
     const { distance, time } = estimateFlightStats(waypoints, 10);
     expect(time).toBeCloseTo(distance / 5, 1);
