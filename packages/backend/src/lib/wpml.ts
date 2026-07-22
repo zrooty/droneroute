@@ -6,6 +6,17 @@ import type {
   PointOfInterest,
 } from "@droneroute/shared";
 
+/**
+ * Which DJI ecosystem the KMZ targets:
+ * - "pilot2": enterprise drones via DJI Pilot 2 (per-model droneEnumValue,
+ *   payloadInfo, multipleDistance triggers). The original behavior.
+ * - "fly": consumer drones via DJI Fly (Mavic 3 Classic/Pro, Air 3, …).
+ *   Uses droneEnumValue 68, no payloadInfo, reachPoint triggers, camera pitch
+ *   via a gimbalEvenlyRotate action, and useStraightLine — mirroring what
+ *   YMapper produces (the known-good DJI Fly reference).
+ */
+export type ExportFormat = "pilot2" | "fly";
+
 // ── XML Helpers ──────────────────────────────────────────
 
 function escapeXml(str: string): string {
@@ -119,20 +130,30 @@ function buildActionXml(action: WaypointAction): string {
           </wpml:action>`;
 }
 
-function buildActionGroupXml(wp: Waypoint, groupIdOffset: number): string {
+function buildActionGroupXml(
+  wp: Waypoint,
+  groupIdOffset: number,
+  format: ExportFormat = "pilot2",
+): string {
   if (wp.actions.length === 0) return "";
 
   const actionsXml = wp.actions.map(buildActionXml).join("");
 
-  const triggerXml =
-    wp.actionTrigger?.type === "multipleDistance"
-      ? `
+  // DJI Fly only understands reachPoint triggers, and each group covers a
+  // single waypoint (start === end). Enterprise keeps multipleDistance ranges.
+  const useMultiple =
+    format !== "fly" && wp.actionTrigger?.type === "multipleDistance";
+
+  const triggerXml = useMultiple
+    ? `
             <wpml:actionTriggerType>multipleDistance</wpml:actionTriggerType>
-            <wpml:actionTriggerParam>${wp.actionTrigger.distanceM}</wpml:actionTriggerParam>`
-      : `
+            <wpml:actionTriggerParam>${wp.actionTrigger!.distanceM}</wpml:actionTriggerParam>`
+    : `
             <wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>`;
 
-  const endIndex = wp.actionTrigger?.endIndex ?? wp.index;
+  const endIndex = useMultiple
+    ? (wp.actionTrigger?.endIndex ?? wp.index)
+    : wp.index;
 
   return `
         <wpml:actionGroup>
@@ -145,16 +166,46 @@ function buildActionGroupXml(wp: Waypoint, groupIdOffset: number): string {
         </wpml:actionGroup>`;
 }
 
+/**
+ * DJI Fly ignores the static <gimbalPitchAngle> field, so the camera pitch is
+ * set with a gimbalEvenlyRotate action on the first waypoint (the drone holds
+ * that pitch for the rest of the flight). Returns the waypoint unchanged for
+ * enterprise, or for any waypoint that isn't the first in fly mode.
+ */
+function flyGimbal(wp: Waypoint, i: number, isFly: boolean): Waypoint {
+  if (!isFly || i !== 0) return wp;
+  const gimbal: WaypointAction = {
+    actionId: 0,
+    actionType: "gimbalEvenlyRotate",
+    params: {
+      gimbalPitchRotateAngle: wp.gimbalPitchAngle,
+      payloadPositionIndex: 0,
+    } as WaypointAction["params"],
+  };
+  // Renumber existing actions after the injected gimbal so ids stay unique.
+  const rest = wp.actions.map((a, idx) => ({ ...a, actionId: idx + 1 }));
+  return { ...wp, actions: [gimbal, ...rest] };
+}
+
 // ── Template KML ─────────────────────────────────────────
 
-export function buildTemplateKml(mission: Mission): string {
+export function buildTemplateKml(
+  mission: Mission,
+  format: ExportFormat = "pilot2",
+): string {
   const c = mission.config;
   const pois = mission.pois || [];
   const now = Date.now();
+  const isFly = format === "fly";
 
   const placemarks = mission.waypoints
     .map((wp, i) => {
-      const actionGroupXml = buildActionGroupXml(wp, i);
+      const wpForActions = flyGimbal(wp, i, isFly);
+      const actionGroupXml = buildActionGroupXml(wpForActions, i, format);
+      const straightLineXml = isFly
+        ? `
+        <wpml:useStraightLine>1</wpml:useStraightLine>`
+        : "";
 
       // Build per-waypoint heading param when using towardPOI
       let headingOverrideXml = "";
@@ -187,15 +238,32 @@ export function buildTemplateKml(mission: Mission): string {
         ${!wp.useGlobalSpeed ? `<wpml:waypointSpeed>${wp.speed}</wpml:waypointSpeed>` : ""}
         <wpml:useGlobalHeadingParam>${wp.useGlobalHeadingParam ? 1 : 0}</wpml:useGlobalHeadingParam>
         <wpml:useGlobalTurnParam>${wp.useGlobalTurnParam ? 1 : 0}</wpml:useGlobalTurnParam>
-        <wpml:gimbalPitchAngle>${wp.gimbalPitchAngle}</wpml:gimbalPitchAngle>${headingOverrideXml}${actionGroupXml}
+        <wpml:gimbalPitchAngle>${wp.gimbalPitchAngle}</wpml:gimbalPitchAngle>${straightLineXml}${headingOverrideXml}${actionGroupXml}
       </Placemark>`;
     })
     .join("");
 
+  const droneInfoXml = missionDroneInfoXml(c, isFly);
+  const payloadInfoXml = isFly
+    ? ""
+    : `
+    <wpml:payloadInfo>
+      <wpml:payloadEnumValue>${c.payloadEnumValue}</wpml:payloadEnumValue>
+      <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
+    </wpml:payloadInfo>`;
+  const authorXml = isFly ? `\n  <wpml:author>fly</wpml:author>` : "";
+  const globalTurnMode = isFly
+    ? "toPointAndStopWithDiscontinuityCurvature"
+    : c.globalTurnMode;
+  const globalStraightLineXml = isFly
+    ? `
+    <wpml:globalUseStraightLine>1</wpml:globalUseStraightLine>`
+    : "";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:wpml="http://www.dji.com/wpmz/1.0.2">
-<Document>
+<Document>${authorXml}
   <wpml:createTime>${now}</wpml:createTime>
   <wpml:updateTime>${now}</wpml:updateTime>
   <wpml:missionConfig>
@@ -205,14 +273,8 @@ export function buildTemplateKml(mission: Mission): string {
     <wpml:executeRCLostAction>${c.executeRCLostAction}</wpml:executeRCLostAction>
     <wpml:takeOffSecurityHeight>${c.takeOffSecurityHeight}</wpml:takeOffSecurityHeight>
     <wpml:globalTransitionalSpeed>${c.globalTransitionalSpeed}</wpml:globalTransitionalSpeed>
-    <wpml:droneInfo>
-      <wpml:droneEnumValue>${c.droneEnumValue}</wpml:droneEnumValue>
-      <wpml:droneSubEnumValue>${c.droneSubEnumValue}</wpml:droneSubEnumValue>
-    </wpml:droneInfo>
-    <wpml:payloadInfo>
-      <wpml:payloadEnumValue>${c.payloadEnumValue}</wpml:payloadEnumValue>
-      <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
-    </wpml:payloadInfo>
+    <wpml:droneInfo>${droneInfoXml}
+    </wpml:droneInfo>${payloadInfoXml}
   </wpml:missionConfig>
   <Folder>
     <wpml:templateType>waypoint</wpml:templateType>
@@ -222,33 +284,53 @@ export function buildTemplateKml(mission: Mission): string {
       <wpml:coordinateMode>WGS84</wpml:coordinateMode>
       <wpml:heightMode>${c.heightMode}</wpml:heightMode>
     </wpml:waylineCoordinateSysParam>
-    <wpml:gimbalPitchMode>${c.gimbalPitchMode}</wpml:gimbalPitchMode>
+    <wpml:gimbalPitchMode>${c.gimbalPitchMode}</wpml:gimbalPitchMode>${globalStraightLineXml}
     <wpml:globalWaypointHeadingParam>
       <wpml:waypointHeadingMode>${c.globalHeadingMode}</wpml:waypointHeadingMode>
       <wpml:waypointHeadingPathMode>followBadArc</wpml:waypointHeadingPathMode>
     </wpml:globalWaypointHeadingParam>
-    <wpml:globalWaypointTurnMode>${c.globalTurnMode}</wpml:globalWaypointTurnMode>${placemarks}
+    <wpml:globalWaypointTurnMode>${globalTurnMode}</wpml:globalWaypointTurnMode>${placemarks}
   </Folder>
 </Document>
 </kml>`;
 }
 
+/** Shared <wpml:droneInfo> body. Fly always reports drone 68. */
+function missionDroneInfoXml(c: MissionConfig, isFly: boolean): string {
+  const drone = isFly ? 68 : c.droneEnumValue;
+  const sub = isFly ? 0 : c.droneSubEnumValue;
+  return `
+      <wpml:droneEnumValue>${drone}</wpml:droneEnumValue>
+      <wpml:droneSubEnumValue>${sub}</wpml:droneSubEnumValue>`;
+}
+
 // ── Waylines WPML ────────────────────────────────────────
 
-export function buildWaylinesWpml(mission: Mission): string {
+export function buildWaylinesWpml(
+  mission: Mission,
+  format: ExportFormat = "pilot2",
+): string {
   const c = mission.config;
   const pois = mission.pois || [];
   const now = Date.now();
+  const isFly = format === "fly";
 
   const placemarks = mission.waypoints
     .map((wp, i) => {
-      const actionGroupXml = buildActionGroupXml(wp, i);
+      const wpForActions = flyGimbal(wp, i, isFly);
+      const actionGroupXml = buildActionGroupXml(wpForActions, i, format);
+      const straightLineXml = isFly
+        ? `
+        <wpml:useStraightLine>1</wpml:useStraightLine>`
+        : "";
       const headingMode = wp.useGlobalHeadingParam
         ? c.globalHeadingMode
         : wp.headingMode || c.globalHeadingMode;
-      const turnMode = wp.useGlobalTurnParam
-        ? c.globalTurnMode
-        : wp.turnMode || c.globalTurnMode;
+      const turnMode = isFly
+        ? "toPointAndStopWithDiscontinuityCurvature"
+        : wp.useGlobalTurnParam
+          ? c.globalTurnMode
+          : wp.turnMode || c.globalTurnMode;
       const speed = wp.useGlobalSpeed ? c.autoFlightSpeed : wp.speed;
 
       // POI pointing: compute bearing or emit POI coordinates
@@ -285,15 +367,25 @@ export function buildWaylinesWpml(mission: Mission): string {
           <wpml:waypointTurnMode>${turnMode}</wpml:waypointTurnMode>
           <wpml:waypointTurnDampingDist>${wp.turnDampingDist ?? 0}</wpml:waypointTurnDampingDist>
         </wpml:waypointTurnParam>
-        <wpml:gimbalPitchAngle>${wp.gimbalPitchAngle}</wpml:gimbalPitchAngle>${actionGroupXml}
+        <wpml:gimbalPitchAngle>${wp.gimbalPitchAngle}</wpml:gimbalPitchAngle>${straightLineXml}${actionGroupXml}
       </Placemark>`;
     })
     .join("");
 
+  const droneInfoXml = missionDroneInfoXml(c, isFly);
+  const payloadInfoXml = isFly
+    ? ""
+    : `
+    <wpml:payloadInfo>
+      <wpml:payloadEnumValue>${c.payloadEnumValue}</wpml:payloadEnumValue>
+      <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
+    </wpml:payloadInfo>`;
+  const authorXml = isFly ? `\n  <wpml:author>fly</wpml:author>` : "";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"
      xmlns:wpml="http://www.dji.com/wpmz/1.0.2">
-<Document>
+<Document>${authorXml}
   <wpml:createTime>${now}</wpml:createTime>
   <wpml:updateTime>${now}</wpml:updateTime>
   <wpml:missionConfig>
@@ -303,14 +395,8 @@ export function buildWaylinesWpml(mission: Mission): string {
     <wpml:executeRCLostAction>${c.executeRCLostAction}</wpml:executeRCLostAction>
     <wpml:takeOffSecurityHeight>${c.takeOffSecurityHeight}</wpml:takeOffSecurityHeight>
     <wpml:globalTransitionalSpeed>${c.globalTransitionalSpeed}</wpml:globalTransitionalSpeed>
-    <wpml:droneInfo>
-      <wpml:droneEnumValue>${c.droneEnumValue}</wpml:droneEnumValue>
-      <wpml:droneSubEnumValue>${c.droneSubEnumValue}</wpml:droneSubEnumValue>
-    </wpml:droneInfo>
-    <wpml:payloadInfo>
-      <wpml:payloadEnumValue>${c.payloadEnumValue}</wpml:payloadEnumValue>
-      <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
-    </wpml:payloadInfo>
+    <wpml:droneInfo>${droneInfoXml}
+    </wpml:droneInfo>${payloadInfoXml}
   </wpml:missionConfig>
   <Folder>
     <wpml:templateId>0</wpml:templateId>

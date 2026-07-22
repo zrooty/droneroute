@@ -1,9 +1,16 @@
 import archiver from "archiver";
 import { PassThrough } from "stream";
 import type { Mission } from "@droneroute/shared";
-import { buildTemplateKml, buildWaylinesWpml } from "../lib/wpml.js";
+import {
+  buildTemplateKml,
+  buildWaylinesWpml,
+  type ExportFormat,
+} from "../lib/wpml.js";
 
-export function generateKmzBuffer(mission: Mission): Promise<Buffer> {
+export function generateKmzBuffer(
+  mission: Mission,
+  format: ExportFormat = "pilot2",
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const archive = archiver("zip", { zlib: { level: 9 } });
     const chunks: Buffer[] = [];
@@ -16,11 +23,11 @@ export function generateKmzBuffer(mission: Mission): Promise<Buffer> {
     archive.pipe(passthrough);
 
     // Add template.kml
-    const templateKml = buildTemplateKml(mission);
+    const templateKml = buildTemplateKml(mission, format);
     archive.append(templateKml, { name: "template.kml" });
 
     // Add waylines.wpml
-    const waylinesWpml = buildWaylinesWpml(mission);
+    const waylinesWpml = buildWaylinesWpml(mission, format);
     archive.append(waylinesWpml, { name: "waylines.wpml" });
 
     // Add empty res/ directory

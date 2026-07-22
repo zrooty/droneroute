@@ -27,13 +27,14 @@ kmzRoutes.post(
   optionalAuth,
   async (req: AuthRequest, res) => {
     try {
-      const { name, config, waypoints, pois } = req.body;
+      const { name, config, waypoints, pois, exportFormat } = req.body;
       if (!config || !waypoints || waypoints.length < 2) {
         res
           .status(400)
           .json({ error: "At least 2 waypoints and a config are required" });
         return;
       }
+      const format = exportFormat === "fly" ? "fly" : "pilot2";
 
       const geometryError = validateMissionGeometry({ waypoints, pois });
       if (geometryError) {
@@ -52,7 +53,7 @@ kmzRoutes.post(
         obstacles: [],
       };
 
-      const buffer = await generateKmzBuffer(mission);
+      const buffer = await generateKmzBuffer(mission, format);
 
       const filename = `${mission.name.replace(/[^a-zA-Z0-9_-]/g, "_")}.kmz`;
       res.setHeader("Content-Type", "application/vnd.google-earth.kmz");

@@ -88,6 +88,7 @@ export default function App() {
 
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportFormat, setExportFormat] = useState<"pilot2" | "fly">("pilot2");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -257,6 +258,7 @@ export default function App() {
           config,
           waypoints: parts[i],
           pois,
+          exportFormat,
         });
 
         const filename =
@@ -567,6 +569,36 @@ export default function App() {
             className="hidden"
             onChange={handleImport}
           />
+        </div>
+
+        {/* Export target — enterprise (Pilot 2) vs consumer (DJI Fly) */}
+        <div className="flex items-center gap-1 px-2 pb-2 border-b border-border">
+          <span className="text-[10px] text-muted-foreground mr-1">
+            Export for
+          </span>
+          {(
+            [
+              ["pilot2", "DJI Pilot 2"],
+              ["fly", "DJI Fly"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setExportFormat(value)}
+              className={`flex-1 text-[11px] h-6 rounded border transition-colors ${
+                exportFormat === value
+                  ? "border-blue-500/50 bg-blue-500/20 text-blue-300"
+                  : "border-transparent bg-secondary text-muted-foreground hover:text-foreground"
+              }`}
+              title={
+                value === "fly"
+                  ? "Consumer drones (Mavic 3 Classic/Pro, Air 3) via DJI Fly"
+                  : "Enterprise drones via DJI Pilot 2"
+              }
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Drone model — top-level because it drives GSD/interval/spacing */}

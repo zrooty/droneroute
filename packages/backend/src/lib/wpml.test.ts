@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_MISSION_CONFIG, DEFAULT_WAYPOINT } from "@droneroute/shared";
 import type { Mission, Waypoint } from "@droneroute/shared";
-import { buildWaylinesWpml } from "./wpml.js";
+import { buildWaylinesWpml, buildTemplateKml } from "./wpml.js";
 
 function makeMission(waypoints: Waypoint[]): Mission {
   return {
@@ -99,5 +99,71 @@ describe("buildActionGroupXml via buildWaylinesWpml — multipleDistance (grid f
     expect(xml).toContain(
       "<wpml:actionTriggerParam>25</wpml:actionTriggerParam>",
     );
+  });
+});
+
+describe("DJI Fly export format", () => {
+  const gridStart: Waypoint = {
+    ...DEFAULT_WAYPOINT,
+    index: 0,
+    name: "Waypoint 1",
+    latitude: 1,
+    longitude: 2,
+    gimbalPitchAngle: -90,
+    actions: [
+      {
+        actionId: 0,
+        actionType: "takePhoto",
+        params: { payloadPositionIndex: 0 },
+      },
+    ],
+    // Even if a multipleDistance trigger is present, fly must downgrade it.
+    actionTrigger: { type: "multipleDistance", distanceM: 25, endIndex: 1 },
+  };
+  const gridEnd: Waypoint = {
+    ...DEFAULT_WAYPOINT,
+    index: 1,
+    name: "Waypoint 2",
+    latitude: 1.001,
+    longitude: 2,
+    actions: [
+      {
+        actionId: 0,
+        actionType: "takePhoto",
+        params: { payloadPositionIndex: 0 },
+      },
+    ],
+  };
+
+  it("reports drone 68 and omits payloadInfo", () => {
+    const xml = buildWaylinesWpml(makeMission([gridStart, gridEnd]), "fly");
+    expect(xml).toContain("<wpml:droneEnumValue>68</wpml:droneEnumValue>");
+    expect(xml).not.toContain("<wpml:payloadInfo>");
+    expect(xml).toContain("<wpml:author>fly</wpml:author>");
+  });
+
+  it("forces reachPoint triggers (no multipleDistance) in fly mode", () => {
+    const xml = buildWaylinesWpml(makeMission([gridStart, gridEnd]), "fly");
+    expect(xml).not.toContain("multipleDistance");
+    expect(xml).toContain(
+      "<wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>",
+    );
+  });
+
+  it("sets camera pitch via a gimbalEvenlyRotate action on the first waypoint", () => {
+    const xml = buildTemplateKml(makeMission([gridStart, gridEnd]), "fly");
+    expect(xml).toContain(
+      "<wpml:actionActuatorFunc>gimbalEvenlyRotate</wpml:actionActuatorFunc>",
+    );
+    expect(xml).toContain(
+      "<wpml:gimbalPitchRotateAngle>-90</wpml:gimbalPitchRotateAngle>",
+    );
+    expect(xml).toContain("<wpml:useStraightLine>1</wpml:useStraightLine>");
+  });
+
+  it("keeps enterprise output unchanged by default (payloadInfo present, drone as configured)", () => {
+    const xml = buildWaylinesWpml(makeMission([gridStart, gridEnd]));
+    expect(xml).toContain("<wpml:payloadInfo>");
+    expect(xml).not.toContain("<wpml:author>fly</wpml:author>");
   });
 });
