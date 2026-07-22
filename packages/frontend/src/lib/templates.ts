@@ -354,6 +354,17 @@ export function generateGrid(params: GridParams): TemplateResult {
     return [centerLat + rLat, centerLng + rLng / cosCenter];
   }
 
+  // Mapping mode: drop a real waypoint every `photoIntervalM` along each pass,
+  // each taking a photo — instead of 2 endpoints + a DJI multipleDistance
+  // trigger. Explicit points match the operator's mental model and give the
+  // split-into-parts feature fine (per-interval) granularity for near-equal
+  // parts. Falls back to 2-endpoints-per-pass in manual spacing mode.
+  const useDensePhotos =
+    spacingMode === "overlap" &&
+    addPhotos &&
+    photoIntervalM !== undefined &&
+    photoIntervalM > 0;
+
   for (let pass = 0; pass < numPasses; pass++) {
     const fraction = numPasses <= 1 ? 0 : pass / (numPasses - 1);
     const reverse = pass % 2 === 1; // lawn-mower pattern: alternate direction
@@ -394,40 +405,50 @@ export function generateGrid(params: GridParams): TemplateResult {
       [[rLat1, rLng1], [rLat2, rLng2]] = clipped;
     }
 
-    // Geometry only here — actions/actionTrigger are assigned AFTER the
-    // final `if (reverse) waypoints.reverse()` below, based on each pair's
-    // final order. Baking them in before that reversal would leave
-    // actionTrigger.endIndex pointing at the wrong (or a backward) index
-    // once the whole array gets flipped.
-    waypoints.push({
+    const base = {
       ...DEFAULT_WAYPOINT,
-      latitude: rLat1,
-      longitude: rLng1,
       height: altitude,
       gimbalPitchAngle: -90,
       useGlobalHeadingParam: false,
-      headingMode: "followWayline",
-      turnMode: "toPointAndStopWithContinuityCurvature",
+      headingMode: "followWayline" as const,
+      turnMode: "toPointAndStopWithContinuityCurvature" as const,
       useGlobalTurnParam: false,
-      actions: [],
-    });
-    waypoints.push({
-      ...DEFAULT_WAYPOINT,
-      latitude: rLat2,
-      longitude: rLng2,
-      height: altitude,
-      gimbalPitchAngle: -90,
-      useGlobalHeadingParam: false,
-      headingMode: "followWayline",
-      turnMode: "toPointAndStopWithContinuityCurvature",
-      useGlobalTurnParam: false,
-      actions: [],
-    });
+    };
+
+    if (useDensePhotos) {
+      // Densify this pass into waypoints spaced ~photoIntervalM apart
+      // (endpoints inclusive), each taking a photo. Symmetric per-waypoint
+      // action means the later `waypoints.reverse()` is safe with no fixup.
+      const lineLen = haversine(rLat1, rLng1, rLat2, rLng2);
+      const steps = Math.max(1, Math.round(lineLen / photoIntervalM!));
+      for (let j = 0; j <= steps; j++) {
+        const t = j / steps;
+        waypoints.push({
+          ...base,
+          latitude: rLat1 + (rLat2 - rLat1) * t,
+          longitude: rLng1 + (rLng2 - rLng1) * t,
+          actions: [{ ...takePhotoAction, actionId: 0 }],
+        });
+      }
+      continue;
+    }
+
+    // Manual mode: 2 endpoints per pass. actions/actionTrigger are assigned
+    // AFTER the final `if (reverse) waypoints.reverse()` below, based on each
+    // pair's final order. Baking them in before that reversal would leave
+    // actionTrigger.endIndex pointing at the wrong (or a backward) index once
+    // the whole array gets flipped.
+    waypoints.push({ ...base, latitude: rLat1, longitude: rLng1, actions: [] });
+    waypoints.push({ ...base, latitude: rLat2, longitude: rLng2, actions: [] });
   }
 
   if (reverse) {
     waypoints.reverse();
   }
+
+  // Dense mode already assigned a photo action per waypoint above; the
+  // 2-per-pass pairing logic below only applies to manual spacing mode.
+  if (useDensePhotos) return { waypoints, pois: [] };
 
   // Assign actions/actionTrigger from the FINAL waypoint order. Each
   // line-pass occupies two consecutive indices in `waypoints` — this holds

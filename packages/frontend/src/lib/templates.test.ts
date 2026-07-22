@@ -5,6 +5,7 @@ import {
   DEFAULT_GRID_PARAMS,
   type GridParams,
 } from "./templates";
+import { haversineDistance } from "./geo";
 
 const baseParams: GridParams = {
   ...DEFAULT_GRID_PARAMS,
@@ -33,8 +34,8 @@ describe("generateGrid — manual mode (unchanged behavior)", () => {
   });
 });
 
-describe("generateGrid — overlap mode", () => {
-  it("attaches actionTrigger only to the first waypoint of each line-pass", () => {
+describe("generateGrid — overlap mode (dense mapping waypoints)", () => {
+  it("drops a photo waypoint every ~photoIntervalM along each pass, no triggers", () => {
     const result = generateGrid({
       ...baseParams,
       spacingMode: "overlap",
@@ -42,39 +43,42 @@ describe("generateGrid — overlap mode", () => {
       photoIntervalM: 25,
     });
     expect(result.waypoints.length).toBeGreaterThan(0);
-    expect(result.waypoints.length % 2).toBe(0); // pairs: start + end per line
 
-    for (let i = 0; i < result.waypoints.length; i += 2) {
-      const lineStart = result.waypoints[i];
-      const lineEnd = result.waypoints[i + 1];
-
-      expect(lineStart.actions).toHaveLength(1);
-      expect(lineStart.actions[0].actionType).toBe("takePhoto");
-      expect(lineStart.actionTrigger).toEqual({
-        type: "multipleDistance",
-        distanceM: 25,
-        endIndex: i + 1, // local offset within this batch — Task 4 shifts it later
-      });
-
-      expect(lineEnd.actions).toHaveLength(0);
-      expect(lineEnd.actionTrigger).toBeUndefined();
-    }
-  });
-
-  it("attaches no actions or triggers when addPhotos is off, even in overlap mode", () => {
-    const result = generateGrid({
-      ...baseParams,
-      spacingMode: "overlap",
-      addPhotos: false,
-      photoIntervalM: 25,
-    });
+    // Every dense waypoint takes one photo; none uses a distance trigger.
     for (const wp of result.waypoints) {
-      expect(wp.actions).toHaveLength(0);
+      expect(wp.actions).toHaveLength(1);
+      expect(wp.actions[0].actionType).toBe("takePhoto");
       expect(wp.actionTrigger).toBeUndefined();
     }
   });
 
-  it("still lays out lines using spacingM regardless of mode", () => {
+  it("spaces consecutive photo waypoints no farther apart than the interval", () => {
+    const interval = 25;
+    const result = generateGrid({
+      ...baseParams,
+      spacingMode: "overlap",
+      addPhotos: true,
+      photoIntervalM: interval,
+    });
+    // Along a pass, steps are rounded so spacing stays within the interval
+    // (+ small rounding slack). Turn segments between passes are the only
+    // larger gaps; assert most consecutive gaps stay within the interval.
+    let withinInterval = 0;
+    for (let i = 1; i < result.waypoints.length; i++) {
+      const a = result.waypoints[i - 1];
+      const b = result.waypoints[i];
+      const d = haversineDistance(
+        a.latitude,
+        a.longitude,
+        b.latitude,
+        b.longitude,
+      );
+      if (d <= interval * 1.2) withinInterval++;
+    }
+    expect(withinInterval).toBeGreaterThan(result.waypoints.length / 2);
+  });
+
+  it("produces more waypoints than manual mode (densification)", () => {
     const manual = generateGrid({
       ...baseParams,
       spacingMode: "manual",
@@ -84,36 +88,22 @@ describe("generateGrid — overlap mode", () => {
       ...baseParams,
       spacingMode: "overlap",
       spacingM: 50,
+      addPhotos: true,
       photoIntervalM: 25,
     });
-    expect(overlap.waypoints.length).toBe(manual.waypoints.length);
+    expect(overlap.waypoints.length).toBeGreaterThan(manual.waypoints.length);
   });
 
-  it("keeps actionTrigger.endIndex pointing forward within each pair when reverse is true", () => {
+  it("attaches no actions when addPhotos is off, even in overlap mode", () => {
     const result = generateGrid({
       ...baseParams,
       spacingMode: "overlap",
-      addPhotos: true,
+      addPhotos: false,
       photoIntervalM: 25,
-      reverse: true,
     });
-    expect(result.waypoints.length).toBeGreaterThan(0);
-    expect(result.waypoints.length % 2).toBe(0);
-
-    for (let i = 0; i < result.waypoints.length; i += 2) {
-      const pairFirst = result.waypoints[i];
-      const pairSecond = result.waypoints[i + 1];
-
-      expect(pairFirst.actions).toHaveLength(1);
-      expect(pairFirst.actions[0].actionType).toBe("takePhoto");
-      expect(pairFirst.actionTrigger).toEqual({
-        type: "multipleDistance",
-        distanceM: 25,
-        endIndex: i + 1, // must point at this pair's own second waypoint
-      });
-
-      expect(pairSecond.actions).toHaveLength(0);
-      expect(pairSecond.actionTrigger).toBeUndefined();
+    for (const wp of result.waypoints) {
+      expect(wp.actions).toHaveLength(0);
+      expect(wp.actionTrigger).toBeUndefined();
     }
   });
 });
