@@ -23,7 +23,10 @@ import {
   toDisplayDistance,
   fromDisplayDistance,
   speedRange,
+  formatDistance,
+  formatDuration,
 } from "@/lib/units";
+import { splitWaypointsByDistance, estimateFlightStats } from "@/lib/geo";
 import {
   spacingFromSidelap,
   intervalFromFrontlap,
@@ -53,6 +56,17 @@ interface TemplateConfigPanelProps {
   onApply: () => void;
   onCancel: () => void;
   waypointCount: number;
+  previewWaypoints?: {
+    latitude: number;
+    longitude: number;
+    speed: number;
+    useGlobalSpeed: boolean;
+    actionTrigger?: { endIndex: number };
+  }[];
+  splitParts?: number;
+  onSplitPartsChange?: (n: number) => void;
+  autoFlightSpeed?: number;
+  maxBatteryMinutes?: number;
   pois?: PointOfInterest[];
 }
 
@@ -70,6 +84,11 @@ export function TemplateConfigPanel({
   onApply,
   onCancel,
   waypointCount,
+  previewWaypoints = [],
+  splitParts = 1,
+  onSplitPartsChange,
+  autoFlightSpeed = 7,
+  maxBatteryMinutes = 25,
   pois,
 }: TemplateConfigPanelProps) {
   const unitSystem = usePreferencesStore((s) => s.preferences.unitSystem);
@@ -89,6 +108,11 @@ export function TemplateConfigPanel({
         : type === "facade"
           ? "Vertical scanning pattern along a wall or building face. Set the standoff distance, altitude range, and grid density for full coverage."
           : "Freehand flight path drawn on the map. Adjust the number of waypoints to control how closely the path is followed.";
+
+  const gridPreviewParts =
+    type === "grid" && splitParts > 1 && previewWaypoints.length > 0
+      ? splitWaypointsByDistance(previewWaypoints, splitParts)
+      : [];
 
   // Stop all pointer/keyboard/wheel events from reaching Leaflet (native DOM level)
   const panelRef = useRef<HTMLDivElement>(null);
@@ -472,6 +496,60 @@ export function TemplateConfigPanel({
               Reverse
             </label>
           </div>
+
+          {onSplitPartsChange && (
+            <div className="mt-2 pt-2 border-t border-border/50">
+              <Label className="text-[10px]">Split into parts</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-6 w-6 p-0 text-xs"
+                  onClick={() =>
+                    onSplitPartsChange(Math.max(1, splitParts - 1))
+                  }
+                >
+                  −
+                </Button>
+                <span className="text-xs w-6 text-center">{splitParts}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-6 w-6 p-0 text-xs"
+                  onClick={() => {
+                    const maxParts = Math.max(
+                      1,
+                      Math.floor((waypointCount + splitParts - 1) / 2),
+                    );
+                    onSplitPartsChange(Math.min(maxParts, splitParts + 1));
+                  }}
+                >
+                  +
+                </Button>
+              </div>
+              {gridPreviewParts.length > 1 && (
+                <div className="mt-1 space-y-0.5">
+                  {gridPreviewParts.map((part, i) => {
+                    const stats = estimateFlightStats(part, autoFlightSpeed);
+                    const overBattery = stats.time > maxBatteryMinutes * 60;
+                    return (
+                      <div
+                        key={i}
+                        className={`text-[10px] ${overBattery ? "text-red-400" : "text-muted-foreground"}`}
+                      >
+                        Part {i + 1}{" "}
+                        {formatDistance(stats.distance, unitSystem)} ·{" "}
+                        {formatDuration(stats.time)}
+                        {overBattery ? " (exceeds max battery)" : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
