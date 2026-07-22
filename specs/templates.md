@@ -5,7 +5,7 @@ Create common flight patterns automatically instead of placing waypoints one by 
 ## What you can do
 
 - **Orbit**: fly a circular path around a center point. Choose radius, number of waypoints, and direction (clockwise or counter-clockwise).
-- **Grid survey**: fly a back-and-forth zigzag pattern over an area. Useful for mapping or photogrammetry. You can draw the area by hand, or import a KML polygon (e.g. from ArcGIS) and the grid will automatically follow its shape. Choose line spacing manually, or switch to overlap mode and set sidelap %/frontlap % instead — spacing and photo-capture interval are computed automatically from the selected drone's camera and altitude (requires a drone/payload with known camera specs).
+- **Grid survey**: fly a back-and-forth zigzag pattern over an area. Useful for mapping or photogrammetry. You can draw the area by hand, or import a KML polygon (e.g. from ArcGIS) and the grid will automatically follow its shape and center the map on it. Choose line spacing manually, or switch to overlap mode and set sidelap %/frontlap % instead — spacing and photo-capture interval are computed automatically from the selected drone's camera and altitude (requires a drone/payload with known camera specs).
 - **Facade scan**: fly a vertical scanning pattern along a building face. Useful for inspections.
 - **Pencil path**: draw a freehand path on the map and the app places evenly spaced waypoints along it.
 

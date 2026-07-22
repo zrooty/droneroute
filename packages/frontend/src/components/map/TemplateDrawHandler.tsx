@@ -116,8 +116,19 @@ export function TemplateDrawHandler() {
       polygon: pendingImportPolygon,
     });
     setConfirmed(true);
+
+    // Center the map on the imported polygon so the operator sees it
+    // immediately instead of the default view.
+    map?.fitBounds(
+      [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)],
+      ],
+      { padding: 60, maxZoom: 17, duration: 800 },
+    );
+
     useMissionStore.getState().setPendingImportPolygon(null);
-  }, [pendingImportPolygon]);
+  }, [pendingImportPolygon, map]);
 
   // Map mouse events for drag-to-draw
   useEffect(() => {
