@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import {
   MapPin,
   X,
@@ -164,18 +164,20 @@ export function WaypointList() {
         const routeStats = route ? routeInfo?.stats[route - 1] : undefined;
 
         return (
-          <div key={wp.index}>
+          <Fragment key={wp.index}>
             {showRouteHeader && (
-              <div className="flex items-center justify-between gap-2 mt-2 first:mt-0 mb-1 px-1 py-0.5 rounded bg-primary/10 border-l-2 border-primary">
-                <span className="text-[11px] font-semibold text-primary">
-                  Route {route}
-                </span>
-                {routeStats && (
-                  <span className="text-[10px] text-muted-foreground">
-                    {formatDistance(routeStats.distance, unitSystem)} ·{" "}
-                    {formatDuration(routeStats.time)}
+              <div className="sticky top-0 z-20 -mx-2 px-2 mb-1 bg-background">
+                <div className="flex items-center justify-between gap-2 px-1 py-0.5 rounded bg-primary/10 border-l-2 border-primary">
+                  <span className="text-[11px] font-semibold text-primary">
+                    Route {route}
                   </span>
-                )}
+                  {routeStats && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatDistance(routeStats.distance, unitSystem)} ·{" "}
+                      {formatDuration(routeStats.time)}
+                    </span>
+                  )}
+                </div>
               </div>
             )}
             <div
@@ -276,7 +278,7 @@ export function WaypointList() {
                 <WaypointEditorInline waypointIndex={wp.index} />
               </div>
             )}
-          </div>
+          </Fragment>
         );
       })}
     </div>
